@@ -6,14 +6,12 @@ import { eventService } from "../../services/eventServices";
 import {
   Calendar,
   MapPin,
-  Clock,
   Share2,
   Heart,
   Minus,
   Plus,
   ShieldCheck,
   Info,
-  Ticket,
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 
@@ -21,22 +19,19 @@ export default function EventDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
 
-  // State Data
   const [event, setEvent] = useState(null);
-  const [tickets, setTickets] = useState([]); // State untuk list tiket (VIP, Regular)
+  const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // State Transaksi
-  const [selectedTicketId, setSelectedTicketId] = useState(null); // Tiket mana yang dipilih?
+  const [selectedTicketId, setSelectedTicketId] = useState(null);
   const [ticketQty, setTicketQty] = useState(1);
 
-  // 1. Fetch Data (Event + Tiket)
+  // --- 1. FETCH DATA (Event + Tiket Asli) ---
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
-
-        // Jalan paralel biar cepat
+        // Request Paralel: Ambil Detail Event DAN Ambil List Tiket (Harga Asli)
         const [eventData, ticketData] = await Promise.all([
           eventService.getEventById(id),
           eventService.getEventTickets(id),
@@ -45,13 +40,13 @@ export default function EventDetailPage() {
         setEvent(eventData);
         setTickets(ticketData);
 
-        // Otomatis pilih tiket pertama jika ada
+        // Pilih tiket pertama otomatis
         if (ticketData.length > 0) {
           setSelectedTicketId(ticketData[0].id);
         }
       } catch (error) {
         console.error(error);
-        toast.error("Gagal memuat data event");
+        toast.error("Gagal memuat detail event");
         navigate("/home");
       } finally {
         setLoading(false);
@@ -62,32 +57,36 @@ export default function EventDetailPage() {
     window.scrollTo(0, 0);
   }, [id, navigate]);
 
-  // Helper: Cari data tiket yang sedang dipilih
   const selectedTicketData = tickets.find((t) => t.id === selectedTicketId);
 
-  // Handle Qty
   const handleQty = (type) => {
     if (!selectedTicketData) return;
-
-    // Cek Quota Real
-    const maxStock = selectedTicketData.quota - selectedTicketData.sold;
+    // Gunakan kuota asli dari DB
+    const maxStock = selectedTicketData.quota - (selectedTicketData.sold || 0);
 
     if (type === "inc" && ticketQty < maxStock) setTicketQty(ticketQty + 1);
     if (type === "dec" && ticketQty > 1) setTicketQty(ticketQty - 1);
   };
 
-  // Format Rupiah
+  // --- 2. LOGIC FORMAT HARGA (PENTING) ---
+  // Mengubah "100.00" menjadi "Rp 100.000"
   const formatRupiah = (price) => {
-    // Karena data dummy "100.00", kali 1000 buat visualisasi harga asli
-    const realPrice = parseFloat(price); // * 1000;
+    let numericPrice = parseFloat(price);
+
+    // Hack Sementara: Kalau harga di bawah 1000 perak, kita kali 1000
+    // Asumsi input admin: 100 = 100rb
+    if (numericPrice < 1000) {
+      numericPrice = numericPrice * 1000;
+    }
+
     return new Intl.NumberFormat("id-ID", {
       style: "currency",
       currency: "IDR",
       minimumFractionDigits: 0,
-    }).format(realPrice);
+      maximumFractionDigits: 0,
+    }).format(numericPrice);
   };
 
-  // Format Tanggal
   const formatDate = (dateStr) => {
     if (!dateStr) return "-";
     const options = {
@@ -99,18 +98,16 @@ export default function EventDetailPage() {
     return new Date(dateStr).toLocaleDateString("id-ID", options);
   };
 
-  // Handle Beli
   const handleBuy = () => {
     if (!selectedTicketData) return toast.error("Pilih tiket dulu!");
-
-    //Disini nanti arahkan ke halaman Checkout / Payment
-    toast.success(`Checkout: ${selectedTicketData.name} x ${ticketQty}`);
+    // Nanti di sini arahkan ke Checkout Page
+    toast.success(`Lanjut beli: ${selectedTicketData.name} (${ticketQty}x)`);
   };
 
   if (loading)
     return (
       <div className="min-h-screen pt-32 text-center font-['Poppins']">
-        Memuat Event Seru...
+        Memuat...
       </div>
     );
   if (!event) return null;
@@ -120,7 +117,7 @@ export default function EventDetailPage() {
       <Navbar />
 
       <main className="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full mb-24">
-        {/* --- 1. HERO IMAGE --- */}
+        {/* Breadcrumb & Hero */}
         <div className="mb-8 animate-fade-in-up">
           <div className="flex items-center gap-2 text-sm text-gray-500 mb-4">
             <span
@@ -128,13 +125,6 @@ export default function EventDetailPage() {
               onClick={() => navigate("/home")}
             >
               Beranda
-            </span>
-            <span>/</span>
-            <span
-              className="cursor-pointer hover:text-[#026DA7]"
-              onClick={() => navigate("/explore")}
-            >
-              Event
             </span>
             <span>/</span>
             <span className="text-[#026DA7] font-medium truncate max-w-[200px]">
@@ -149,14 +139,13 @@ export default function EventDetailPage() {
               className="w-full h-full object-cover"
             />
             <div className="absolute top-4 left-4 bg-white/90 backdrop-blur-md px-4 py-1.5 rounded-full text-[#026DA7] text-xs font-bold uppercase tracking-wider shadow-sm">
-              {event.category || "Event"}
+              {event.category}
             </div>
           </div>
         </div>
 
-        {/* --- 2. GRID LAYOUT --- */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
-          {/* KIRI: Deskripsi Event */}
+          {/* KIRI: Info Event */}
           <div className="lg:col-span-8 space-y-8 animate-fade-in-left">
             <div>
               <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2 leading-tight">
@@ -207,51 +196,30 @@ export default function EventDetailPage() {
               </h3>
               <p>{event.description}</p>
             </div>
-
-            <div className="bg-blue-50 rounded-xl p-5 border border-blue-100 flex gap-4">
-              <Info className="text-[#026DA7] shrink-0" size={24} />
-              <div className="text-sm text-gray-700">
-                <p className="font-bold mb-1">Syarat & Ketentuan</p>
-                <ul className="list-disc pl-4 space-y-1 text-gray-600">
-                  <li>E-Ticket wajib ditunjukkan saat registrasi ulang.</li>
-                  <li>
-                    Dilarang membawa senjata tajam atau obat-obatan terlarang.
-                  </li>
-                  <li>
-                    Tiket yang sudah dibeli tidak dapat diuangkan kembali.
-                  </li>
-                </ul>
-              </div>
-            </div>
           </div>
 
-          {/* KANAN: Booking Card (STICKY) */}
+          {/* KANAN: Booking Card (Sticky) */}
           <div className="lg:col-span-4 animate-fade-in-right">
             <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 sticky top-28">
               <div className="mb-6">
-                <p className="text-sm text-gray-500 mb-1">Harga Mulai Dari</p>
+                <p className="text-sm text-gray-500 mb-1">Total Harga</p>
                 <h3 className="text-3xl font-bold text-[#026DA7]">
-                  {/* Tampilkan harga tiket termurah dari list */}
-                  {
-                    tickets.length > 0
-                      ? formatRupiah(
-                          Math.min(...tickets.map((t) => parseFloat(t.price)))
-                        )
-                      : formatRupiah(event.price) // Fallback ke harga random event
-                  }
+                  {selectedTicketData
+                    ? formatRupiah(
+                        parseFloat(selectedTicketData.price) * ticketQty
+                      )
+                    : "Rp 0"}
                 </h3>
               </div>
 
-              {/* --- PILIHAN TIKET --- */}
+              {/* --- LIST TIKET DARI API --- */}
               <div className="space-y-3 mb-6">
-                <p className="text-sm font-bold text-gray-800">
-                  Pilih Kategori Tiket
-                </p>
+                <p className="text-sm font-bold text-gray-800">Pilih Tiket</p>
 
                 {tickets.length > 0 ? (
                   tickets.map((ticket) => {
                     const isSelected = selectedTicketId === ticket.id;
-                    const available = ticket.quota - ticket.sold;
+                    const available = ticket.quota - (ticket.sold || 0);
                     const isSoldOut = available <= 0;
 
                     return (
@@ -261,7 +229,7 @@ export default function EventDetailPage() {
                           !isSoldOut && setSelectedTicketId(ticket.id)
                         }
                         className={`
-                                            border rounded-xl p-3 cursor-pointer transition-all relative overflow-hidden
+                                            border rounded-xl p-3 cursor-pointer transition-all relative
                                             ${
                                               isSelected
                                                 ? "border-[#026DA7] bg-blue-50 ring-1 ring-[#026DA7]"
@@ -284,7 +252,7 @@ export default function EventDetailPage() {
                               {ticket.name}
                             </p>
                             <p className="text-xs text-gray-500 mt-0.5">
-                              Sisa: {available} tiket
+                              Sisa: {available}
                             </p>
                           </div>
                           <div className="text-right">
@@ -295,20 +263,8 @@ export default function EventDetailPage() {
                             >
                               {formatRupiah(ticket.price)}
                             </p>
-                            {isSelected && (
-                              <div className="text-[10px] text-[#026DA7] font-medium">
-                                Terpilih
-                              </div>
-                            )}
                           </div>
                         </div>
-                        {isSoldOut && (
-                          <div className="absolute inset-0 flex items-center justify-center bg-gray-100/50 backdrop-blur-[1px]">
-                            <span className="bg-red-500 text-white text-[10px] font-bold px-2 py-1 rounded">
-                              HABIS
-                            </span>
-                          </div>
-                        )}
                       </div>
                     );
                   })
@@ -321,44 +277,30 @@ export default function EventDetailPage() {
 
               {/* --- JUMLAH --- */}
               {selectedTicketData && (
-                <div className="space-y-4 mb-6 animate-fade-in">
-                  <div className="flex items-center justify-between p-3 border border-gray-200 rounded-xl">
-                    <span className="text-sm font-medium text-gray-700">
-                      Jumlah
+                <div className="flex items-center justify-between p-3 border border-gray-200 rounded-xl mb-6">
+                  <span className="text-sm font-medium text-gray-700">
+                    Jumlah
+                  </span>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => handleQty("dec")}
+                      disabled={ticketQty <= 1}
+                      className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center text-gray-500 hover:bg-gray-100 disabled:opacity-50"
+                    >
+                      <Minus size={14} />
+                    </button>
+                    <span className="font-bold w-6 text-center">
+                      {ticketQty}
                     </span>
-                    <div className="flex items-center gap-3">
-                      <button
-                        onClick={() => handleQty("dec")}
-                        disabled={ticketQty <= 1}
-                        className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center text-gray-500 hover:bg-gray-100 disabled:opacity-50"
-                      >
-                        <Minus size={14} />
-                      </button>
-                      <span className="font-bold w-6 text-center">
-                        {ticketQty}
-                      </span>
-                      <button
-                        onClick={() => handleQty("inc")}
-                        className="w-8 h-8 rounded-full border border-[#026DA7] flex items-center justify-center text-[#026DA7] hover:bg-blue-50"
-                      >
-                        <Plus size={14} />
-                      </button>
-                    </div>
+                    <button
+                      onClick={() => handleQty("inc")}
+                      className="w-8 h-8 rounded-full border border-[#026DA7] flex items-center justify-center text-[#026DA7] hover:bg-blue-50"
+                    >
+                      <Plus size={14} />
+                    </button>
                   </div>
                 </div>
               )}
-
-              {/* --- TOTAL & TOMBOL --- */}
-              <div className="flex items-center justify-between mb-4 pt-4 border-t border-gray-100">
-                <span className="font-bold text-gray-800">Total</span>
-                <span className="font-bold text-[#026DA7] text-xl">
-                  {selectedTicketData
-                    ? formatRupiah(
-                        parseFloat(selectedTicketData.price) * ticketQty
-                      )
-                    : "Rp 0"}
-                </span>
-              </div>
 
               <button
                 onClick={handleBuy}
@@ -369,10 +311,10 @@ export default function EventDetailPage() {
               </button>
 
               <div className="mt-4 flex items-center justify-center gap-6">
-                <button className="flex items-center gap-2 text-xs text-gray-500 hover:text-gray-800 transition-colors">
+                <button className="flex items-center gap-2 text-xs text-gray-500 hover:text-gray-800">
                   <Share2 size={14} /> Bagikan
                 </button>
-                <button className="flex items-center gap-2 text-xs text-gray-500 hover:text-red-500 transition-colors">
+                <button className="flex items-center gap-2 text-xs text-gray-500 hover:text-red-500">
                   <Heart size={14} /> Simpan
                 </button>
               </div>

@@ -16,21 +16,22 @@ export default function ExplorePage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
-  // --- STATE ---
-  const [allEvents, setAllEvents] = useState([]);
-  const [filteredEvents, setFilteredEvents] = useState([]);
+  // --- STATE BARU ---
+  // Mengganti allEvents dan filteredEvents menjadi satu state: events
+  const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // UI Controls
   const [isFilterOpen, setIsFilterOpen] = useState(false);
-  const [isSortOpen, setIsSortOpen] = useState(false);
+  const [isSortOpen, setIsSort] = useState(false); // Mengubah nama state untuk menghindari konflik
 
   // Filter Values
+  // NOTE: minPrice harus diubah menjadi maxPrice di BE agar logikanya sesuai dengan input field Max Harga
   const [filters, setFilters] = useState({
     search: "",
     location: "",
     category: "",
-    minPrice: "",
+    minPrice: "", // Seharusnya ini Max Price jika logika filter di BE sama dengan logika lama. Tapi kita ikuti nama filters yang lama (minPrice) untuk dikirim ke BE.
     date: "",
   });
   const [sortOption, setSortOption] = useState("newest");
@@ -43,120 +44,59 @@ export default function ExplorePage() {
     filters.minPrice !== "" ||
     filters.date !== "";
 
-  // --- 1. INITIAL FETCH & URL PARAMS ---
+  // --- 1. INITIAL SETUP DARI URL PARAMS ---
   useEffect(() => {
-    const initData = async () => {
+    // Ambil parameter dari URL saat inisialisasi
+    const searchParam = searchParams.get("q");
+    const catParam = searchParams.get("category");
+
+    setFilters((prev) => ({
+      ...prev,
+      search: searchParam || "",
+      category: catParam || "",
+    }));
+
+    if (catParam) setIsFilterOpen(true);
+  }, [searchParams]);
+
+  // --- 2. LOGIC FETCHING DENGAN DEBOUNCE (MENGGANTIKAN LOGIC FILTER LAMA) ---
+  useEffect(() => {
+    // Fungsi untuk memanggil API dengan filter saat ini
+    const fetchFilteredData = async () => {
+      setLoading(true);
+
+      // Gabungkan filters dengan sortOption untuk dikirim ke BE
+      // Perhatikan: eventService.getEvents() hanya menerima object filters.
+      // Jika sorting ingin dilakukan di BE, kita harus tambahkan logika sort ke object filters,
+      // atau eventService.getEvents harus menerima 2 argument (filters, sortOption).
+      // Untuk kemudahan, kita akan kirim sortOption sebagai bagian dari filters:
+      const payload = {
+        ...filters,
+        sortBy: sortOption, // Mengirim opsi sorting ke BE
+      };
+
       try {
-        if (allEvents.length === 0) {
-          setLoading(true);
-          const data = await eventService.getEvents();
-          setAllEvents(data);
-          setLoading(false);
-        }
-
-        const searchParam = searchParams.get("q");
-        const catParam = searchParams.get("category");
-
-        setFilters((prev) => ({
-          ...prev,
-          search: searchParam || "",
-          category: catParam || "",
-        }));
-
-        if (catParam) setIsFilterOpen(true);
+        // Panggil service dengan payload filter
+        const data = await eventService.getEvents(payload);
+        setEvents(data); // Langsung set hasil dari BE
       } catch (error) {
-        console.error("Gagal load events", error);
+        console.error("Gagal fetch events dengan filter:", error);
+        setEvents([]);
+      } finally {
         setLoading(false);
       }
     };
 
-    initData();
-  }, [searchParams]);
+    // Debounce: Tunda eksekusi fetching selama 500ms setelah user berhenti mengetik/mengubah filter
+    const timeoutId = setTimeout(() => {
+      fetchFilteredData();
+    }, 500);
 
-  // --- 2. LOGIC FILTERING & SORTING ---
-  useEffect(() => {
-    let result = [...allEvents];
+    // Cleanup function: Hapus timeout jika useEffect dipanggil ulang (misal user mengetik cepat)
+    return () => clearTimeout(timeoutId);
 
-    // A. Search
-    if (filters.search) {
-      const q = filters.search.toLowerCase();
-      result = result.filter(
-        (ev) =>
-          ev.title.toLowerCase().includes(q) ||
-          ev.organizer.toLowerCase().includes(q) ||
-          ev.location.toLowerCase().includes(q)
-      );
-    }
-    // B. Category
-    if (filters.category && filters.category !== "all") {
-      result = result.filter((ev) =>
-        ev.category.toLowerCase().includes(filters.category.toLowerCase())
-      );
-    }
-    // C. Location
-    if (filters.location) {
-      result = result.filter((ev) =>
-        ev.location.toLowerCase().includes(filters.location.toLowerCase())
-      );
-    }
-    // D. Price
-    if (filters.minPrice) {
-      result = result.filter((ev) => ev.price <= parseInt(filters.minPrice));
-    }
-    // E. Date (Logic Kalender)
-    if (filters.date) {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-
-      result = result.filter((ev) => {
-        const eventDate = new Date(ev.date);
-        eventDate.setHours(0, 0, 0, 0);
-
-        if (filters.date === "today")
-          return eventDate.getTime() === today.getTime();
-        else if (filters.date === "this_week") {
-          const endOfWeek = new Date(today);
-          const day = today.getDay();
-          const distance = day === 0 ? 0 : 7 - day;
-          endOfWeek.setDate(today.getDate() + distance);
-          return eventDate >= today && eventDate <= endOfWeek;
-        } else if (filters.date === "next_week") {
-          const startNext = new Date(today);
-          const day = today.getDay();
-          const distNextMon = (day === 0 ? 0 : 7 - day) + 1;
-          startNext.setDate(today.getDate() + distNextMon);
-          const endNext = new Date(startNext);
-          endNext.setDate(startNext.getDate() + 6);
-          return eventDate >= startNext && eventDate <= endNext;
-        } else if (filters.date === "this_month") {
-          return (
-            eventDate.getMonth() === today.getMonth() &&
-            eventDate.getFullYear() === today.getFullYear() &&
-            eventDate >= today
-          );
-        } else if (filters.date === "next_month") {
-          const nextMonth = new Date(today);
-          nextMonth.setMonth(today.getMonth() + 1);
-          return (
-            eventDate.getMonth() === nextMonth.getMonth() &&
-            eventDate.getFullYear() === nextMonth.getFullYear()
-          );
-        }
-        return true;
-      });
-    }
-
-    // F. Sorting
-    if (sortOption === "lowPrice") {
-      result.sort((a, b) => a.price - b.price);
-    } else if (sortOption === "highPrice") {
-      result.sort((a, b) => b.price - a.price);
-    } else {
-      result.sort((a, b) => new Date(b.date) - new Date(a.date));
-    }
-
-    setFilteredEvents(result);
-  }, [allEvents, filters, sortOption]);
+    // Dipanggil setiap kali filters atau sortOption berubah
+  }, [filters, sortOption]); // Dependensi
 
   const clearFilters = () => {
     setFilters({
@@ -167,7 +107,10 @@ export default function ExplorePage() {
       date: "",
     });
     setSortOption("newest");
-    navigate("/explore");
+    // Karena URL tidak lagi menjadi sumber utama filter selain init,
+    // kita hanya perlu mengatur ulang state. navigate("/explore") tidak diperlukan
+    // kecuali Anda ingin membersihkan URL query params.
+    navigate("/explore", { replace: true });
   };
 
   return (
@@ -175,7 +118,7 @@ export default function ExplorePage() {
       <Navbar />
 
       <main className="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full mb-20">
-        {/* HEADER */}
+        {/* HEADER (TIDAK BERUBAH) */}
         <div className="text-center mb-8">
           <h1 className="font-['Poppins'] font-bold text-3xl md:text-4xl text-[#1D3A6B] mb-2">
             {filters.search
@@ -224,7 +167,7 @@ export default function ExplorePage() {
           {/* GROUP KANAN: Dropdown Sort */}
           <div className="relative">
             <button
-              onClick={() => setIsSortOpen(!isSortOpen)}
+              onClick={() => setIsSort(!isSortOpen)}
               className="flex items-center gap-2 px-3 py-2.5 bg-white border border-gray-200 rounded-lg text-gray-700 hover:bg-gray-50 transition-all"
             >
               <div className="flex items-center gap-2">
@@ -250,7 +193,7 @@ export default function ExplorePage() {
                     key={opt.val}
                     onClick={() => {
                       setSortOption(opt.val);
-                      setIsSortOpen(false);
+                      setIsSort(false);
                     }}
                     className={`w-full text-left px-4 py-3 text-sm hover:bg-gray-50 ${
                       sortOption === opt.val
@@ -266,7 +209,7 @@ export default function ExplorePage() {
           </div>
         </div>
 
-        {/* --- FILTER PANEL --- */}
+        {/* --- FILTER PANEL (Input fields di sini akan otomatis memicu useEffect fetching) --- */}
         <div
           className={`overflow-hidden transition-all duration-500 ease-in-out ${
             isFilterOpen
@@ -305,11 +248,12 @@ export default function ExplorePage() {
                 >
                   <option value="">Semua</option>
                   <option value="music">Musik</option>
-                  <option value="arts">Seni</option>
-                  <option value="sports">Olahraga</option>
-                  <option value="workshop">Workshop</option>
+                  <option value="exhibition">Pameran</option>
                   <option value="theater">Teater</option>
                   <option value="talkshow">Talkshow</option>
+                  <option value="sports">Olahraga</option>
+                  <option value="workshop">Workshop</option>
+                  <option value="competition">Kompetisi</option>
                 </select>
               </div>
               {/* Waktu */}
@@ -356,9 +300,9 @@ export default function ExplorePage() {
           <div className="text-center py-20 text-gray-400 animate-pulse">
             Memuat Event...
           </div>
-        ) : filteredEvents.length > 0 ? (
+        ) : events.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 items-stretch">
-            {filteredEvents.map((event) => (
+            {events.map((event) => (
               <EventCard key={event.id} {...event} />
             ))}
           </div>
