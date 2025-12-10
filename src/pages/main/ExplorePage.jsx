@@ -16,27 +16,27 @@ export default function ExplorePage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
-  // --- STATE BARU ---
-  // Mengganti allEvents dan filteredEvents menjadi satu state: events
+  // --- STATE ---
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // --- STATE BARU: LAZY LOADING ---
+  const [visibleLimit, setVisibleLimit] = useState(8);
+
   // UI Controls
   const [isFilterOpen, setIsFilterOpen] = useState(false);
-  const [isSortOpen, setIsSort] = useState(false); // Mengubah nama state untuk menghindari konflik
+  const [isSortOpen, setIsSort] = useState(false);
 
   // Filter Values
-  // NOTE: minPrice harus diubah menjadi maxPrice di BE agar logikanya sesuai dengan input field Max Harga
   const [filters, setFilters] = useState({
     search: "",
     location: "",
     category: "",
-    minPrice: "", // Seharusnya ini Max Price jika logika filter di BE sama dengan logika lama. Tapi kita ikuti nama filters yang lama (minPrice) untuk dikirim ke BE.
+    minPrice: "",
     date: "",
   });
   const [sortOption, setSortOption] = useState("newest");
 
-  // Logic cek apakah ada filter aktif
   const hasActiveFilters =
     filters.search !== "" ||
     filters.location !== "" ||
@@ -44,9 +44,8 @@ export default function ExplorePage() {
     filters.minPrice !== "" ||
     filters.date !== "";
 
-  // --- 1. INITIAL SETUP DARI URL PARAMS ---
+  // --- 1. INITIAL SETUP ---
   useEffect(() => {
-    // Ambil parameter dari URL saat inisialisasi
     const searchParam = searchParams.get("q");
     const catParam = searchParams.get("category");
 
@@ -59,44 +58,37 @@ export default function ExplorePage() {
     if (catParam) setIsFilterOpen(true);
   }, [searchParams]);
 
-  // --- 2. LOGIC FETCHING DENGAN DEBOUNCE (MENGGANTIKAN LOGIC FILTER LAMA) ---
+  // --- 2. FETCHING DATA ---
   useEffect(() => {
-    // Fungsi untuk memanggil API dengan filter saat ini
     const fetchFilteredData = async () => {
       setLoading(true);
 
-      // Gabungkan filters dengan sortOption untuk dikirim ke BE
-      // Perhatikan: eventService.getEvents() hanya menerima object filters.
-      // Jika sorting ingin dilakukan di BE, kita harus tambahkan logika sort ke object filters,
-      // atau eventService.getEvents harus menerima 2 argument (filters, sortOption).
-      // Untuk kemudahan, kita akan kirim sortOption sebagai bagian dari filters:
       const payload = {
         ...filters,
-        sortBy: sortOption, // Mengirim opsi sorting ke BE
+        sortBy: sortOption,
       };
 
       try {
-        // Panggil service dengan payload filter
         const data = await eventService.getEvents(payload);
-        setEvents(data); // Langsung set hasil dari BE
+        setEvents(data);
+
+        // RESET LAZY LOAD SAAT FILTER BERUBAH
+        // Setiap kali user cari/filter baru, kembalikan tampilan ke 8 kartu awal
+        setVisibleLimit(8);
       } catch (error) {
-        console.error("Gagal fetch events dengan filter:", error);
+        console.error("Gagal fetch events:", error);
         setEvents([]);
       } finally {
         setLoading(false);
       }
     };
 
-    // Debounce: Tunda eksekusi fetching selama 500ms setelah user berhenti mengetik/mengubah filter
     const timeoutId = setTimeout(() => {
       fetchFilteredData();
     }, 500);
 
-    // Cleanup function: Hapus timeout jika useEffect dipanggil ulang (misal user mengetik cepat)
     return () => clearTimeout(timeoutId);
-
-    // Dipanggil setiap kali filters atau sortOption berubah
-  }, [filters, sortOption]); // Dependensi
+  }, [filters, sortOption]);
 
   const clearFilters = () => {
     setFilters({
@@ -107,10 +99,13 @@ export default function ExplorePage() {
       date: "",
     });
     setSortOption("newest");
-    // Karena URL tidak lagi menjadi sumber utama filter selain init,
-    // kita hanya perlu mengatur ulang state. navigate("/explore") tidak diperlukan
-    // kecuali Anda ingin membersihkan URL query params.
     navigate("/explore", { replace: true });
+  };
+
+  // --- FUNGSI LOAD MORE ---
+  const handleLoadMore = () => {
+    // Tambah 8 kartu lagi setiap diklik
+    setVisibleLimit((prev) => prev + 8);
   };
 
   return (
@@ -118,7 +113,7 @@ export default function ExplorePage() {
       <Navbar />
 
       <main className="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full mb-20">
-        {/* HEADER (TIDAK BERUBAH) */}
+        {/* HEADER */}
         <div className="text-center mb-8">
           <h1 className="font-['Poppins'] font-bold text-3xl md:text-4xl text-[#1D3A6B] mb-2">
             {filters.search
@@ -134,7 +129,7 @@ export default function ExplorePage() {
 
         {/* --- CONTROL BAR --- */}
         <div className="flex flex-row justify-between items-center gap-3 mb-8 bg-transparent">
-          {/* GROUP KIRI: Filter Button + Reset */}
+          {/* GROUP KIRI */}
           <div className="flex items-center gap-2">
             <button
               onClick={() => setIsFilterOpen(!isFilterOpen)}
@@ -152,8 +147,6 @@ export default function ExplorePage() {
                 <ChevronDown size={16} className="ml-1 opacity-70" />
               )}
             </button>
-
-            {/* TOMBOL RESET FILTER */}
             {hasActiveFilters && (
               <button
                 onClick={clearFilters}
@@ -164,7 +157,7 @@ export default function ExplorePage() {
             )}
           </div>
 
-          {/* GROUP KANAN: Dropdown Sort */}
+          {/* GROUP KANAN */}
           <div className="relative">
             <button
               onClick={() => setIsSort(!isSortOpen)}
@@ -172,14 +165,12 @@ export default function ExplorePage() {
             >
               <div className="flex items-center gap-2">
                 <SlidersHorizontal size={18} />
-
                 <span className="text-sm hidden md:block whitespace-nowrap">
                   {sortOption === "newest" && "Paling Baru"}
                   {sortOption === "lowPrice" && "Harga Terendah"}
                   {sortOption === "highPrice" && "Harga Tertinggi"}
                 </span>
               </div>
-
               <ChevronDown size={16} className="text-gray-400" />
             </button>
             {isSortOpen && (
@@ -209,7 +200,7 @@ export default function ExplorePage() {
           </div>
         </div>
 
-        {/* --- FILTER PANEL (Input fields di sini akan otomatis memicu useEffect fetching) --- */}
+        {/* --- FILTER PANEL --- */}
         <div
           className={`overflow-hidden transition-all duration-500 ease-in-out ${
             isFilterOpen
@@ -284,7 +275,7 @@ export default function ExplorePage() {
                 <input
                   type="number"
                   placeholder="Rp..."
-                  className="w-full p-2 border-b border-gray-200 focus:border-[#026DA7] outline-none text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  className="w-full p-2 border-b border-gray-200 focus:border-[#026DA7] outline-none text-sm [appearance:textfield]"
                   value={filters.minPrice}
                   onChange={(e) =>
                     setFilters({ ...filters, minPrice: e.target.value })
@@ -301,11 +292,32 @@ export default function ExplorePage() {
             Memuat Event...
           </div>
         ) : events.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 items-stretch">
-            {events.map((event) => (
-              <EventCard key={event.id} {...event} />
-            ))}
-          </div>
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 items-stretch animate-fade-in-up">
+              {events.slice(0, visibleLimit).map((event) => (
+                <EventCard key={event.id} {...event} />
+              ))}
+            </div>
+
+            {/* TOMBOL LOAD MORE*/}
+            {visibleLimit < events.length && (
+              <div className="mt-12 flex flex-col items-center">
+                <div className="w-full max-w-xs border-t border-gray-100 mb-8"></div>
+
+                <button
+                  onClick={handleLoadMore}
+                  className="px-10 py-3 rounded-full border border-gray-300 text-gray-600 text-sm font-medium hover:border-[#026DA7] hover:text-[#026DA7] hover:bg-blue-50/50 transition-all duration-300 tracking-wide"
+                >
+                  Tampilkan Lebih Banyak
+                </button>
+
+                <p className="text-[11px] text-gray-400 mt-4 tracking-wide">
+                  Menampilkan {Math.min(visibleLimit, events.length)} dari{" "}
+                  {events.length} event
+                </p>
+              </div>
+            )}
+          </>
         ) : (
           <div className="text-center py-20">
             <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4 text-gray-400">
