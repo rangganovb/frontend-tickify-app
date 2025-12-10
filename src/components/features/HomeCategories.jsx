@@ -14,7 +14,7 @@ export const HomeCategories = () => {
 
   const categories = [
     { label: "Musik", slug: "music", icon: Music },
-    { label: "Pameran", slug: "arts", icon: Palette },
+    { label: "Pameran", slug: "exhibition", icon: Palette },
     { label: "Teater", slug: "theater", icon: Ticket },
     { label: "Talkshow", slug: "talkshow", icon: Mic },
     { label: "Olahraga", slug: "sports", icon: Dumbbell },

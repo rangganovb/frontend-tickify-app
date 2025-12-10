@@ -1,8 +1,8 @@
-import { useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom"; // Ganti useNavigate jadi Link
 import { Logo } from "../common/logo";
 
 export const Footer = () => {
-  const navigate = useNavigate();
+  // const navigate = useNavigate(); <-- HAPUS INI
 
   return (
     <footer className="bg-[#026da7] pt-12 pb-28 md:pb-12 border-t border-white/10">
@@ -23,25 +23,28 @@ export const Footer = () => {
             </h4>
             <ul className="space-y-3">
               <li>
-                <button
-                  onClick={() => navigate("/about")}
-                  className="font-['Poppins'] text-[13px] text-white/70 hover:text-white transition-colors text-left"
+                <Link
+                  to="/about"
+                  className="font-['Poppins'] text-[13px] text-white/70 hover:text-white transition-colors text-left block"
                 >
                   Tentang Tickify
-                </button>
+                </Link>
               </li>
               <li>
-                <button
-                  onClick={() => navigate("/contact")}
-                  className="font-['Poppins'] text-[13px] text-white/70 hover:text-white transition-colors text-left"
+                <Link
+                  to="/contact"
+                  className="font-['Poppins'] text-[13px] text-white/70 hover:text-white transition-colors text-left block"
                 >
                   Hubungi Kami
-                </button>
+                </Link>
               </li>
               <li>
-                <button className="font-['Poppins'] text-[13px] text-white/70 hover:text-white transition-colors text-left">
+                <Link
+                  to="#"
+                  className="font-['Poppins'] text-[13px] text-white/70 hover:text-white transition-colors text-left block"
+                >
                   Blog & Berita
-                </button>
+                </Link>
               </li>
             </ul>
           </div>
@@ -53,52 +56,62 @@ export const Footer = () => {
             </h4>
             <ul className="space-y-3">
               <li>
-                <button className="font-['Poppins'] text-[13px] text-white/70 hover:text-white transition-colors text-left">
+                <Link
+                  to="#"
+                  className="font-['Poppins'] text-[13px] text-white/70 hover:text-white transition-colors text-left block"
+                >
                   FAQ
-                </button>
+                </Link>
               </li>
               <li>
-                <button className="font-['Poppins'] text-[13px] text-white/70 hover:text-white transition-colors text-left">
+                <Link
+                  to="#"
+                  className="font-['Poppins'] text-[13px] text-white/70 hover:text-white transition-colors text-left block"
+                >
                   Cara Pembelian
-                </button>
+                </Link>
               </li>
               <li>
-                <button className="font-['Poppins'] text-[13px] text-white/70 hover:text-white transition-colors text-left">
+                <Link
+                  to="#"
+                  className="font-['Poppins'] text-[13px] text-white/70 hover:text-white transition-colors text-left block"
+                >
                   Kebijakan Refund
-                </button>
+                </Link>
               </li>
             </ul>
           </div>
 
-          {/* KOLOM 4: Kategori */}
+          {/* KOLOM 4: Kategori Event */}
+          {/* NOTE: Saya sesuaikan linknya agar nyambung dengan Filter ExplorePage kita */}
           <div>
             <h4 className="font-['Poppins'] font-bold text-[15px] text-white mb-4">
               Kategori Event
             </h4>
             <ul className="space-y-3">
               <li>
-                <button
-                  onClick={() => navigate("/explore?cat=konser")}
-                  className="font-['Poppins'] text-[13px] text-white/70 hover:text-white transition-colors text-left"
+                <Link
+                  to="/explore?category=music"
+                  className="font-['Poppins'] text-[13px] text-white/70 hover:text-white transition-colors text-left block"
                 >
                   Konser
-                </button>
+                </Link>
               </li>
               <li>
-                <button
-                  onClick={() => navigate("/explore?cat=festival")}
-                  className="font-['Poppins'] text-[13px] text-white/70 hover:text-white transition-colors text-left"
+                <Link
+                  to="/explore?category=exhibition"
+                  className="font-['Poppins'] text-[13px] text-white/70 hover:text-white transition-colors text-left block"
                 >
-                  Festival
-                </button>
+                  Pameran
+                </Link>
               </li>
               <li>
-                <button
-                  onClick={() => navigate("/explore?cat=sports")}
-                  className="font-['Poppins'] text-[13px] text-white/70 hover:text-white transition-colors text-left"
+                <Link
+                  to="/explore?category=sports"
+                  className="font-['Poppins'] text-[13px] text-white/70 hover:text-white transition-colors text-left block"
                 >
                   Olahraga
-                </button>
+                </Link>
               </li>
             </ul>
           </div>

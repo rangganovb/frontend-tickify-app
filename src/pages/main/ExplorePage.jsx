@@ -58,7 +58,7 @@ export default function ExplorePage() {
     if (catParam) setIsFilterOpen(true);
   }, [searchParams]);
 
-  // --- 2. FETCHING DATA ---
+  // --- 2. FETCHING DATA & CLIENT-SIDE FILTERING ---
   useEffect(() => {
     const fetchFilteredData = async () => {
       setLoading(true);
@@ -69,11 +69,41 @@ export default function ExplorePage() {
       };
 
       try {
-        const data = await eventService.getEvents(payload);
+        // 1. Ambil data dari API (Mungkin BE balikin semua data)
+        let data = await eventService.getEvents(payload);
+
+        // --- 2. LOGIC FILTERING FRONTEND (BACKUP) ---
+        // Kita filter lagi di sini untuk memastikan data sesuai keinginan
+
+        // A. Filter Kategori
+        if (filters.category && filters.category !== "") {
+          data = data.filter(
+            (ev) =>
+              ev.category?.toLowerCase() === filters.category.toLowerCase()
+          );
+        }
+
+        // B. Filter Search (Judul / Lokasi)
+        if (filters.search) {
+          const q = filters.search.toLowerCase();
+          data = data.filter(
+            (ev) =>
+              ev.title?.toLowerCase().includes(q) ||
+              ev.location?.toLowerCase().includes(q) ||
+              ev.venue?.toLowerCase().includes(q)
+          );
+        }
+
+        // C. Filter Lokasi (Dropdown)
+        if (filters.location) {
+          data = data.filter((ev) =>
+            ev.location?.toLowerCase().includes(filters.location.toLowerCase())
+          );
+        }
+
         setEvents(data);
 
-        // RESET LAZY LOAD SAAT FILTER BERUBAH
-        // Setiap kali user cari/filter baru, kembalikan tampilan ke 8 kartu awal
+        // Reset Lazy Load
         setVisibleLimit(8);
       } catch (error) {
         console.error("Gagal fetch events:", error);
