@@ -86,6 +86,14 @@ export default function ProfilePage() {
         fullName: user.full_name || "",
         phoneNumber: safePhone,
       });
+      // Ambil data user lama dari LocalStorage
+      const savedUser = JSON.parse(localStorage.getItem("user") || "{}");
+      // Gabungkan data lama dengan data baru dari API
+      const updatedUser = { ...savedUser, ...user };
+      // Simpan balik ke LocalStorage
+      localStorage.setItem("user", JSON.stringify(updatedUser));
+      // Trigger agar Navbar me-render ulang foto profilnya
+      window.dispatchEvent(new Event("userUpdated"));
     } catch (error) {
       console.error(error);
       toast.error("Gagal memuat profil");

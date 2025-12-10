@@ -13,23 +13,87 @@ import {
   LogIn,
   UserPlus,
 } from "lucide-react";
+// Pastikan path ini benar
+import { userService } from "../../services/userService";
 
 export const Navbar = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [isSearchOpen, setIsSearchOpen] = useState(false);
 
-  // CEK STATUS LOGIN dengan cek apakah ada token di localStorage
-  const token = localStorage.getItem("token");
-  const isLoggedIn = !!token;
+  // --- 1. UBAH JADI STATE (Agar Reaktif) ---
+  // Kita tidak lagi membaca localStorage langsung di body component
+  const [userData, setUserData] = useState(null);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
-  // Ambil data user jika login
-  const userString = localStorage.getItem("user");
-  const user = userString ? JSON.parse(userString) : null;
+  // --- 2. LOGIC SINKRONISASI DATA (REVISED / BARU) ---
+  useEffect(() => {
+    // A. Fungsi Baca LocalStorage (Biar tampil instan dulu saat load)
+    const loadFromStorage = () => {
+      const token = localStorage.getItem("token");
+      const userString = localStorage.getItem("user");
+
+      setIsLoggedIn(!!token);
+      if (userString) {
+        setUserData(JSON.parse(userString));
+      } else {
+        setUserData(null);
+      }
+    };
+
+    // B. Fungsi Fetch Data Terbaru dari API (Self-Healing / Background Check)
+    // Ini jurus rahasia biar foto profil muncul walau data login awal gak lengkap
+    const fetchLatestUser = async () => {
+      const token = localStorage.getItem("token");
+      if (!token) return; // Gak perlu fetch kalau gak login
+
+      try {
+        const response = await userService.getProfile();
+        // Handle struktur response be: { user: {...} } atau langsung {...}
+        const freshUser = response.user || response;
+
+        // Simpan data terbaru (yang ada fotonya) ke Storage
+        localStorage.setItem("user", JSON.stringify(freshUser));
+
+        // Update State Navbar agar foto langsung muncul
+        setUserData(freshUser);
+      } catch (error) {
+        console.error("Silent refresh profil gagal", error);
+        // Kalau token expired (401), sekalian logoutin otomatis (opsional tapi aman)
+        if (error.response?.status === 401) {
+          localStorage.clear();
+          setIsLoggedIn(false);
+          setUserData(null);
+          navigate("/login");
+        }
+      }
+    };
+
+    // --- EKSEKUSI ---
+
+    // 1. Load data storage saat pertama mount (Instan)
+    loadFromStorage();
+
+    // 2. Fetch data terbaru di background (PENTING BUAT MUNCULIN FOTO)
+    fetchLatestUser();
+
+    // 3. Event Listener (Supaya tetap reaktif kalau diedit di ProfilePage atau Login)
+    const handleUserUpdate = () => loadFromStorage();
+    window.addEventListener("userUpdated", handleUserUpdate);
+    window.addEventListener("storage", handleUserUpdate);
+
+    return () => {
+      window.removeEventListener("userUpdated", handleUserUpdate);
+      window.removeEventListener("storage", handleUserUpdate);
+    };
+  }, [navigate]);
+
+  // --- Logic Avatar (Menggunakan State userData) ---
   const userAvatar =
-    user?.avatar ||
+    userData?.avatar ||
+    userData?.profile_picture_url || // Jaga-jaga nama field beda
     `https://ui-avatars.com/api/?name=${
-      user?.full_name || "User"
+      userData?.full_name || "User"
     }&background=random`;
 
   const navItems = [
@@ -41,7 +105,7 @@ export const Navbar = () => {
 
   const isActive = (path) => location.pathname === path;
 
-  // Efek scroll lock
+  // Efek scroll lock saat search open
   useEffect(() => {
     if (isSearchOpen) document.body.style.overflow = "hidden";
     else document.body.style.overflow = "unset";
@@ -96,7 +160,7 @@ export const Navbar = () => {
                 <Search size={20} className="md:w-[22px] md:h-[22px]" />
               </button>
 
-              {/* SMART LOGIN */}
+              {/* SMART LOGIN STATUS */}
               {isLoggedIn ? (
                 // --- TAMPILAN SUDAH LOGIN (Avatar) ---
                 <div
@@ -112,14 +176,12 @@ export const Navbar = () => {
               ) : (
                 // --- TAMPILAN BELUM LOGIN (Tombol Masuk/Daftar) ---
                 <div className="flex items-center gap-2">
-                  {/* Tombol Masuk */}
                   <button
                     onClick={() => navigate("/login")}
                     className="hidden sm:flex px-5 py-2.5 text-white font-medium text-sm hover:text-blue-100 transition-colors"
                   >
                     Masuk
                   </button>
-                  {/* Tombol Daftar */}
                   <button
                     onClick={() => navigate("/register")}
                     className="px-5 py-2.5 bg-white text-[#026DA7] rounded-full font-bold text-sm shadow-md hover:bg-gray-100 transition-all transform hover:scale-105 flex items-center gap-2"
