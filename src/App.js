@@ -11,6 +11,8 @@ import ProfilePage from "./pages/user/UserProfilePage";
 import AboutPage from "./pages/main/AboutPage";
 import ContactPage from "./pages/main/ContactPage";
 import EventDetailPage from "./pages/main/EventDetailPage";
+import CheckoutPage from "./pages/transaction/CheckoutPage";
+import PaymentPage from "./pages/transaction/PaymentPage";
 
 function App() {
   const [isLoading, setIsLoading] = useState(true);
@@ -21,6 +23,9 @@ function App() {
       <Toaster
         position="top-center"
         reverseOrder={false}
+        containerStyle={{
+          zIndex: 999999,
+        }}
         toastOptions={{
           duration: 4000,
           style: {
@@ -74,6 +79,10 @@ function App() {
           <Route path="/profile" element={<ProfilePage />} />
 
           {/* ... (Placeholder / 404) ... */}
+
+          {/* --- Transaksi --- */}
+          <Route path="/checkout" element={<CheckoutPage />} />
+          <Route path="/payment/:id" element={<PaymentPage />} />
         </Routes>
       </div>
     </BrowserRouter>

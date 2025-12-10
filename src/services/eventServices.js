@@ -66,12 +66,30 @@ export const eventService = {
   },
 
   // 4. GET MY TICKETS
-  getMyTickets: async () => {
+  getMyTickets: async (page = 1, limit = 10) => {
     try {
-      const response = await api.get("/tickets/mine");
+      const response = await api.get("/tickets/mine", {
+        params: { page, limit },
+      });
+      return {
+        tickets: response.data.data || [],
+        pagination: response.data.pagination || {},
+      };
+    } catch (error) {
+      console.error("Gagal ambil tiket saya:", error);
+      return { tickets: [], pagination: {} };
+    }
+  },
+
+  // 5. GET TICKET DETAIL (Baru)
+  getTicketDetail: async (ticketId) => {
+    try {
+      const response = await api.get(`/tickets/${ticketId}`);
+      // Handle response wrapper (jika ada data.data)
       return response.data.data || response.data;
     } catch (error) {
-      return [];
+      console.error("Gagal ambil detail tiket:", error);
+      throw error;
     }
   },
 };

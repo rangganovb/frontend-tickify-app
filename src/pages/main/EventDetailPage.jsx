@@ -3,16 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { Navbar } from "../../components/layout/Navbar";
 import { Footer } from "../../components/layout/Footer";
 import { eventService } from "../../services/eventServices";
-import {
-  Calendar,
-  MapPin,
-  Share2,
-  Heart,
-  Minus,
-  Plus,
-  ShieldCheck,
-  Info,
-} from "lucide-react";
+import { Calendar, MapPin, Minus, Plus, ShieldCheck } from "lucide-react";
 import { toast } from "react-hot-toast";
 
 export default function EventDetailPage() {
@@ -31,7 +22,7 @@ export default function EventDetailPage() {
     const fetchData = async () => {
       try {
         setLoading(true);
-        // Request Paralel: Ambil Detail Event DAN Ambil List Tiket (Harga Asli)
+        // Ambil Detail Event DAN Ambil List Tiket (Harga Asli)
         const [eventData, ticketData] = await Promise.all([
           eventService.getEventById(id),
           eventService.getEventTickets(id),
@@ -69,12 +60,10 @@ export default function EventDetailPage() {
   };
 
   // --- 2. LOGIC FORMAT HARGA (PENTING) ---
-  // Mengubah "100.00" menjadi "Rp 100.000"
   const formatRupiah = (price) => {
     let numericPrice = parseFloat(price);
 
-    // Hack Sementara: Kalau harga di bawah 1000 perak, kita kali 1000
-    // Asumsi input admin: 100 = 100rb
+    // Kalau harga di bawah 1000 perak, dikali 1000
     if (numericPrice < 1000) {
       numericPrice = numericPrice * 1000;
     }
@@ -99,17 +88,118 @@ export default function EventDetailPage() {
   };
 
   const handleBuy = () => {
+    // 1. Validasi: User harus pilih tiket dulu
     if (!selectedTicketData) return toast.error("Pilih tiket dulu!");
-    // Nanti di sini arahkan ke Checkout Page
-    toast.success(`Lanjut beli: ${selectedTicketData.name} (${ticketQty}x)`);
+
+    // 2. Validasi: User harus Login
+    const token = localStorage.getItem("token");
+    if (!token) {
+      toast.error("Silakan login untuk membeli tiket");
+      navigate("/login");
+      return;
+    }
+
+    // 3. Hitung Harga Total
+    const numericPrice =
+      parseFloat(selectedTicketData.price) < 1000
+        ? parseFloat(selectedTicketData.price) * 1000
+        : parseFloat(selectedTicketData.price);
+
+    const totalPrice = numericPrice * ticketQty;
+
+    // 4. PINDAH KE HALAMAN CHECKOUT
+    navigate("/checkout", {
+      state: {
+        event: {
+          title: event.title,
+          date: formatDate(event.date),
+          time: event.time,
+          venue: event.venue,
+          location: event.location,
+          image: event.image,
+        },
+        ticket: selectedTicketData,
+        qty: ticketQty,
+        totalPrice: totalPrice,
+      },
+    });
   };
 
-  if (loading)
+  if (loading) {
     return (
-      <div className="min-h-screen pt-32 text-center font-['Poppins']">
-        Memuat...
+      <div className="min-h-screen bg-gray-50 pt-28 flex flex-col font-['Poppins']">
+        <Navbar /> {/* Navbar tetap muncul agar tidak kedip */}
+        <main className="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full mb-24">
+          {/* 1. Breadcrumb Skeleton */}
+          <div className="mb-8">
+            <div className="h-4 w-48 bg-gray-200 rounded animate-pulse mb-6"></div>
+
+            {/* 2. Hero Image Skeleton */}
+            <div className="w-full h-[250px] md:h-[400px] bg-gray-200 rounded-2xl animate-pulse"></div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
+            {/* 3. KIRI: Info Event Skeleton */}
+            <div className="lg:col-span-8 space-y-8">
+              <div>
+                {/* Title */}
+                <div className="h-8 md:h-10 w-3/4 bg-gray-200 rounded animate-pulse mb-4"></div>
+
+                {/* Organizer */}
+                <div className="flex items-center gap-3">
+                  <div className="h-4 w-4 rounded-full bg-gray-200 animate-pulse"></div>
+                  <div className="h-4 w-32 bg-gray-200 rounded animate-pulse"></div>
+                </div>
+              </div>
+
+              {/* Info Grid (Date & Location) */}
+              <div className="flex gap-4 border-y border-gray-100 py-6">
+                <div className="flex-1 flex gap-3">
+                  <div className="w-10 h-10 rounded-full bg-gray-200 animate-pulse"></div>
+                  <div className="space-y-2 w-full">
+                    <div className="h-3 w-16 bg-gray-200 rounded animate-pulse"></div>
+                    <div className="h-4 w-3/4 bg-gray-200 rounded animate-pulse"></div>
+                  </div>
+                </div>
+                <div className="flex-1 flex gap-3">
+                  <div className="w-10 h-10 rounded-full bg-gray-200 animate-pulse"></div>
+                  <div className="space-y-2 w-full">
+                    <div className="h-3 w-16 bg-gray-200 rounded animate-pulse"></div>
+                    <div className="h-4 w-3/4 bg-gray-200 rounded animate-pulse"></div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Description */}
+              <div className="space-y-3">
+                <div className="h-6 w-32 bg-gray-200 rounded animate-pulse mb-4"></div>
+                <div className="h-4 w-full bg-gray-200 rounded animate-pulse"></div>
+                <div className="h-4 w-full bg-gray-200 rounded animate-pulse"></div>
+                <div className="h-4 w-2/3 bg-gray-200 rounded animate-pulse"></div>
+              </div>
+            </div>
+
+            {/* 4. KANAN: Booking Card Skeleton */}
+            <div className="lg:col-span-4">
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 h-[400px]">
+                <div className="h-4 w-24 bg-gray-200 rounded animate-pulse mb-2"></div>
+                <div className="h-8 w-48 bg-gray-200 rounded animate-pulse mb-8"></div>
+
+                {/* List Tiket Skeleton */}
+                <div className="space-y-3 mb-8">
+                  <div className="h-16 w-full bg-gray-200 rounded-xl animate-pulse"></div>
+                  <div className="h-16 w-full bg-gray-200 rounded-xl animate-pulse"></div>
+                </div>
+
+                <div className="h-12 w-full bg-gray-200 rounded-xl animate-pulse"></div>
+              </div>
+            </div>
+          </div>
+        </main>
+        <Footer />
       </div>
     );
+  }
   if (!event) return null;
 
   return (
@@ -229,18 +319,18 @@ export default function EventDetailPage() {
                           !isSoldOut && setSelectedTicketId(ticket.id)
                         }
                         className={`
-                                            border rounded-xl p-3 cursor-pointer transition-all relative
-                                            ${
-                                              isSelected
-                                                ? "border-[#026DA7] bg-blue-50 ring-1 ring-[#026DA7]"
-                                                : "border-gray-200 hover:border-gray-300 bg-white"
-                                            }
-                                            ${
-                                              isSoldOut
-                                                ? "opacity-50 cursor-not-allowed bg-gray-50"
-                                                : ""
-                                            }
-                                        `}
+                                    border rounded-xl p-3 cursor-pointer transition-all relative
+                                    ${
+                                      isSelected
+                                        ? "border-[#026DA7] bg-blue-50 ring-1 ring-[#026DA7]"
+                                        : "border-gray-200 hover:border-gray-300 bg-white"
+                                    }
+                                    ${
+                                      isSoldOut
+                                        ? "opacity-50 cursor-not-allowed bg-gray-50"
+                                        : ""
+                                    }
+                                  `}
                       >
                         <div className="flex justify-between items-center">
                           <div>
@@ -309,15 +399,6 @@ export default function EventDetailPage() {
               >
                 Beli Tiket Sekarang
               </button>
-
-              <div className="mt-4 flex items-center justify-center gap-6">
-                <button className="flex items-center gap-2 text-xs text-gray-500 hover:text-gray-800">
-                  <Share2 size={14} /> Bagikan
-                </button>
-                <button className="flex items-center gap-2 text-xs text-gray-500 hover:text-red-500">
-                  <Heart size={14} /> Simpan
-                </button>
-              </div>
             </div>
           </div>
         </div>
