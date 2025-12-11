@@ -73,22 +73,38 @@ export default function ProfilePage() {
     onConfirm: null,
   });
 
+  // --- LOAD PROFILE DI PAGE LOAD ---
+  useEffect(() => {
+    const loadProfileOnce = async () => {
+      try {
+        const userData = await userService.getProfile();
+        const user = userData.user || userData;
+
+        setProfile({
+          full_name: user.full_name || "",
+          email: user.email || "",
+          phone: user.phone_number ? user.phone_number.replace("62", "") : "",
+          avatar_url: user.profile_picture_url || "",
+          avatar: null,
+        });
+      } catch (error) {
+        console.error("Gagal memuat profil awal:", error);
+      }
+    };
+
+    loadProfileOnce();
+  }, []);
+
   // --- 2. FETCH DATA ---
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
       try {
         if (activeTab === "profile") {
-          const userData = await userService.getProfile();
-          const user = userData.user || userData;
-          setProfile({
-            full_name: user.full_name || "",
-            email: user.email || "",
-            phone: user.phone_number ? user.phone_number.replace("62", "") : "",
-            avatar_url: user.profile_picture_url || "",
-            avatar: null,
-          });
-        } else if (activeTab === "tickets") {
+          return setLoading(false);
+        }
+
+        if (activeTab === "tickets") {
           const data = await eventService.getMyTickets();
           setTickets(Array.isArray(data) ? data : data.tickets || []);
         } else if (activeTab === "history") {
