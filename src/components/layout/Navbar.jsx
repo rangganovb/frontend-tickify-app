@@ -13,7 +13,6 @@ import {
   LogIn,
   UserPlus,
 } from "lucide-react";
-// Pastikan path ini benar
 import { userService } from "../../services/userService";
 
 export const Navbar = () => {
@@ -21,14 +20,13 @@ export const Navbar = () => {
   const navigate = useNavigate();
   const [isSearchOpen, setIsSearchOpen] = useState(false);
 
-  // --- 1. UBAH JADI STATE (Agar Reaktif) ---
-  // Kita tidak lagi membaca localStorage langsung di body component
+  // --- 1. STATE MANAGEMENT ---
   const [userData, setUserData] = useState(null);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
-  // --- 2. LOGIC SINKRONISASI DATA (REVISED / BARU) ---
+  // --- 2. DATA SYNCHRONIZATION LOGIC ---
   useEffect(() => {
-    // A. Fungsi Baca LocalStorage (Biar tampil instan dulu saat load)
+    // A. Initial Load Strategy (LocalStorage)
     const loadFromStorage = () => {
       const token = localStorage.getItem("token");
       const userString = localStorage.getItem("user");
@@ -41,25 +39,22 @@ export const Navbar = () => {
       }
     };
 
-    // B. Fungsi Fetch Data Terbaru dari API (Self-Healing / Background Check)
-    // Ini jurus rahasia biar foto profil muncul walau data login awal gak lengkap
+    // B. Background Revalidation (Self-Healing)
     const fetchLatestUser = async () => {
       const token = localStorage.getItem("token");
-      if (!token) return; // Gak perlu fetch kalau gak login
+      if (!token) return;
 
       try {
         const response = await userService.getProfile();
-        // Handle struktur response be: { user: {...} } atau langsung {...}
+        // Normalize response structure
         const freshUser = response.user || response;
 
-        // Simpan data terbaru (yang ada fotonya) ke Storage
+        // Update LocalStorage & State with fresh data
         localStorage.setItem("user", JSON.stringify(freshUser));
-
-        // Update State Navbar agar foto langsung muncul
         setUserData(freshUser);
       } catch (error) {
-        console.error("Silent refresh profil gagal", error);
-        // Kalau token expired (401), sekalian logoutin otomatis (opsional tapi aman)
+        console.error("Background profile refresh failed:", error);
+        // Handle Token Expiration (401)
         if (error.response?.status === 401) {
           localStorage.clear();
           setIsLoggedIn(false);
@@ -69,15 +64,11 @@ export const Navbar = () => {
       }
     };
 
-    // --- EKSEKUSI ---
-
-    // 1. Load data storage saat pertama mount (Instan)
+    // --- EXECUTION ---
     loadFromStorage();
-
-    // 2. Fetch data terbaru di background (PENTING BUAT MUNCULIN FOTO)
     fetchLatestUser();
 
-    // 3. Event Listener (Supaya tetap reaktif kalau diedit di ProfilePage atau Login)
+    // Event Listeners for Cross-Component Updates
     const handleUserUpdate = () => loadFromStorage();
     window.addEventListener("userUpdated", handleUserUpdate);
     window.addEventListener("storage", handleUserUpdate);
@@ -88,10 +79,10 @@ export const Navbar = () => {
     };
   }, [navigate]);
 
-  // --- Logic Avatar (Menggunakan State userData) ---
+  // --- AVATAR LOGIC ---
   const userAvatar =
     userData?.avatar ||
-    userData?.profile_picture_url || // Jaga-jaga nama field beda
+    userData?.profile_picture_url ||
     `https://ui-avatars.com/api/?name=${
       userData?.full_name || "User"
     }&background=random`;
@@ -105,7 +96,6 @@ export const Navbar = () => {
 
   const isActive = (path) => location.pathname === path;
 
-  // Efek scroll lock saat search open
   useEffect(() => {
     if (isSearchOpen) document.body.style.overflow = "hidden";
     else document.body.style.overflow = "unset";
@@ -160,21 +150,41 @@ export const Navbar = () => {
                 <Search size={20} className="md:w-[22px] md:h-[22px]" />
               </button>
 
-              {/* SMART LOGIN STATUS */}
+              {/* --- AUTHENTICATED USER VIEW --- */}
               {isLoggedIn ? (
-                // --- TAMPILAN SUDAH LOGIN (Avatar) ---
-                <div
-                  className="flex items-center gap-3 cursor-pointer pl-1 group"
-                  onClick={() => navigate("/profile")}
-                >
-                  <img
-                    src={userAvatar}
-                    alt="Profile"
-                    className="w-9 h-9 md:w-10 md:h-10 rounded-full object-cover border-2 border-white/20 group-hover:border-white transition-all"
-                  />
+                <div className="relative group">
+                  {/* Profile/Dashboard Trigger */}
+                  <div
+                    className="flex items-center gap-3 cursor-pointer pl-1"
+                    onClick={() => {
+                      // Role-Based Navigation Logic
+                      if (userData?.role === "admin") {
+                        navigate("/admin/dashboard");
+                      } else {
+                        navigate("/profile");
+                      }
+                    }}
+                  >
+                    <img
+                      src={userAvatar}
+                      alt="Profile"
+                      className={`w-9 h-9 md:w-10 md:h-10 rounded-full object-cover border-2 transition-all ${
+                        userData?.role === "admin"
+                          ? "border-red-500 hover:border-red-600" // Visual distinction for Admin
+                          : "border-white/20 group-hover:border-white"
+                      }`}
+                    />
+
+                    {/* Admin Indicator Badge */}
+                    {userData?.role === "admin" && (
+                      <div className="absolute -bottom-1 -right-1 bg-red-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full border border-white shadow-sm">
+                        ADMIN
+                      </div>
+                    )}
+                  </div>
                 </div>
               ) : (
-                // --- TAMPILAN BELUM LOGIN (Tombol Masuk/Daftar) ---
+                // --- GUEST VIEW (Masuk/Daftar) ---
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => navigate("/login")}

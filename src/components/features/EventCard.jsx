@@ -6,19 +6,25 @@ export const EventCard = ({ id, title, date, price, image, organizer }) => {
 
   // Helper Format Rupiah
   const formatRupiah = (number) => {
-    if (number === 0) return "Gratis";
+    const safeNum = parseFloat(number);
+    if (isNaN(safeNum) || safeNum === 0) return "Gratis";
+
     return new Intl.NumberFormat("id-ID", {
       style: "currency",
       currency: "IDR",
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
-    }).format(number);
+    }).format(safeNum);
   };
 
   // Helper Format Tanggal
   const formatDate = (dateString) => {
-    const options = { day: "numeric", month: "long", year: "numeric" };
-    return new Date(dateString).toLocaleDateString("id-ID", options);
+    try {
+      const options = { day: "numeric", month: "long", year: "numeric" };
+      return new Date(dateString).toLocaleDateString("id-ID", options);
+    } catch (e) {
+      return dateString || "-";
+    }
   };
 
   return (
@@ -26,12 +32,15 @@ export const EventCard = ({ id, title, date, price, image, organizer }) => {
       onClick={() => navigate(`/event/${id}`)}
       className="group h-full flex flex-col bg-white rounded-[20px] shadow-sm border border-gray-100 overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 cursor-pointer"
     >
-      {/* 1. IMAGE SECTION (Wide Aspect Ratio 16:9) */}
+      {/* 1. IMAGE SECTION */}
       <div className="relative w-full aspect-[16/9] overflow-hidden">
         <img
-          src={image || "..."}
+          src={
+            image ||
+            "https://images.unsplash.com/photo-1501281668745-f7f57925c3b4"
+          }
           alt={title}
-          loading="lazy" // <--- TAMBAHAN KECIL TAPI PENTING
+          loading="lazy"
           className="w-full h-full object-cover"
         />
         {/* Gradient halus saat hover */}
@@ -64,7 +73,7 @@ export const EventCard = ({ id, title, date, price, image, organizer }) => {
             {organizer ? organizer.substring(0, 2).toUpperCase() : "EO"}
           </div>
           <span className="font-['Poppins'] text-xs text-gray-500 truncate">
-            {organizer || "Unknown Organizer"}
+            {organizer || "Tickify Partner"}
           </span>
         </div>
       </div>

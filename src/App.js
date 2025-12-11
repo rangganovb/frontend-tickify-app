@@ -13,6 +13,7 @@ import ContactPage from "./pages/main/ContactPage";
 import EventDetailPage from "./pages/main/EventDetailPage";
 import CheckoutPage from "./pages/transaction/CheckoutPage";
 import PaymentPage from "./pages/transaction/PaymentPage";
+import AdminProfilePage from "./pages/admin/AdminProfilePage";
 
 function App() {
   const [isLoading, setIsLoading] = useState(true);
@@ -83,6 +84,9 @@ function App() {
           {/* --- Transaksi --- */}
           <Route path="/checkout" element={<CheckoutPage />} />
           <Route path="/payment/:id" element={<PaymentPage />} />
+
+          {/* --- Admin Pages --- */}
+          <Route path="/admin/dashboard" element={<AdminProfilePage />} />
         </Routes>
       </div>
     </BrowserRouter>

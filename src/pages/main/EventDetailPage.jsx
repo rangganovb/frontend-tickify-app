@@ -3,42 +3,57 @@ import { useParams, useNavigate } from "react-router-dom";
 import { Navbar } from "../../components/layout/Navbar";
 import { Footer } from "../../components/layout/Footer";
 import { eventService } from "../../services/eventServices";
-import { Calendar, MapPin, Minus, Plus, ShieldCheck } from "lucide-react";
+import {
+  Calendar,
+  MapPin,
+  Minus,
+  Plus,
+  ShieldCheck,
+  Clock,
+} from "lucide-react";
 import { toast } from "react-hot-toast";
 
 export default function EventDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
 
+  // --- STATE UTAMA ---
   const [event, setEvent] = useState(null);
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // --- STATE TRANSAKSI ---
   const [selectedTicketId, setSelectedTicketId] = useState(null);
   const [ticketQty, setTicketQty] = useState(1);
 
-  // --- 1. FETCH DATA (Event + Tiket Asli) ---
+  // --- 1. PENGAMBILAN DATA (API) ---
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        // Ambil Detail Event DAN Ambil List Tiket (Harga Asli)
+
+        // Eksekusi request secara paralel untuk performa
         const [eventData, ticketData] = await Promise.all([
-          eventService.getEventById(id),
-          eventService.getEventTickets(id),
+          eventService.getEventById(id), // Detail Event
+          eventService.getTicketsByEvent(id), // List Tiket (PERBAIKAN NAMA FUNGSI)
         ]);
 
         setEvent(eventData);
         setTickets(ticketData);
 
-        // Pilih tiket pertama otomatis
-        if (ticketData.length > 0) {
-          setSelectedTicketId(ticketData[0].id);
+        // Otomatis pilih tiket pertama yang stoknya tersedia
+        if (ticketData && ticketData.length > 0) {
+          const availableTicket = ticketData.find(
+            (t) => t.quota - (t.sold || 0) > 0
+          );
+          setSelectedTicketId(
+            availableTicket ? availableTicket.id : ticketData[0].id
+          );
         }
       } catch (error) {
-        console.error(error);
-        toast.error("Gagal memuat detail event");
-        navigate("/home");
+        console.error("Gagal memuat data:", error);
+        toast.error("Detail event tidak ditemukan");
+        navigate("/explore");
       } finally {
         setLoading(false);
       }
@@ -48,25 +63,25 @@ export default function EventDetailPage() {
     window.scrollTo(0, 0);
   }, [id, navigate]);
 
+  // Helper: Ambil data tiket yang sedang dipilih
   const selectedTicketData = tickets.find((t) => t.id === selectedTicketId);
 
+  // --- 2. HANDLER JUMLAH TIKET ---
   const handleQty = (type) => {
     if (!selectedTicketData) return;
-    // Gunakan kuota asli dari DB
-    const maxStock = selectedTicketData.quota - (selectedTicketData.sold || 0);
 
-    if (type === "inc" && ticketQty < maxStock) setTicketQty(ticketQty + 1);
+    const availableStock =
+      selectedTicketData.quota - (selectedTicketData.sold || 0);
+    const maxLimit = Math.min(availableStock, 5); // Batasi maks 5 tiket per transaksi
+
+    if (type === "inc" && ticketQty < maxLimit) setTicketQty(ticketQty + 1);
     if (type === "dec" && ticketQty > 1) setTicketQty(ticketQty - 1);
   };
 
-  // --- 2. LOGIC FORMAT HARGA (PENTING) ---
+  // --- 3. FORMATTER & UTILS ---
   const formatRupiah = (price) => {
     let numericPrice = parseFloat(price);
-
-    // Kalau harga di bawah 1000 perak, dikali 1000
-    if (numericPrice < 1000) {
-      numericPrice = numericPrice * 1000;
-    }
+    if (numericPrice < 1000) numericPrice *= 1000; // Normalisasi harga
 
     return new Intl.NumberFormat("id-ID", {
       style: "currency",
@@ -78,28 +93,28 @@ export default function EventDetailPage() {
 
   const formatDate = (dateStr) => {
     if (!dateStr) return "-";
-    const options = {
+    return new Date(dateStr).toLocaleDateString("id-ID", {
       weekday: "long",
       year: "numeric",
       month: "long",
       day: "numeric",
-    };
-    return new Date(dateStr).toLocaleDateString("id-ID", options);
+    });
   };
 
+  // --- 4. PROSES CHECKOUT ---
   const handleBuy = () => {
-    // 1. Validasi: User harus pilih tiket dulu
-    if (!selectedTicketData) return toast.error("Pilih tiket dulu!");
+    // Validasi input
+    if (!selectedTicketData) return toast.error("Mohon pilih jenis tiket");
 
-    // 2. Validasi: User harus Login
+    // Validasi login
     const token = localStorage.getItem("token");
     if (!token) {
-      toast.error("Silakan login untuk membeli tiket");
+      toast.error("Silakan login untuk melanjutkan");
       navigate("/login");
       return;
     }
 
-    // 3. Hitung Harga Total
+    // Kalkulasi total harga
     const numericPrice =
       parseFloat(selectedTicketData.price) < 1000
         ? parseFloat(selectedTicketData.price) * 1000
@@ -107,7 +122,7 @@ export default function EventDetailPage() {
 
     const totalPrice = numericPrice * ticketQty;
 
-    // 4. PINDAH KE HALAMAN CHECKOUT
+    // Redirect ke halaman checkout dengan membawa data
     navigate("/checkout", {
       state: {
         event: {
@@ -125,74 +140,23 @@ export default function EventDetailPage() {
     });
   };
 
+  // --- TAMPILAN LOADING ---
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 pt-28 flex flex-col font-['Poppins']">
-        <Navbar /> {/* Navbar tetap muncul agar tidak kedip */}
+        <Navbar />
         <main className="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full mb-24">
-          {/* 1. Breadcrumb Skeleton */}
           <div className="mb-8">
             <div className="h-4 w-48 bg-gray-200 rounded animate-pulse mb-6"></div>
-
-            {/* 2. Hero Image Skeleton */}
             <div className="w-full h-[250px] md:h-[400px] bg-gray-200 rounded-2xl animate-pulse"></div>
           </div>
-
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
-            {/* 3. KIRI: Info Event Skeleton */}
             <div className="lg:col-span-8 space-y-8">
-              <div>
-                {/* Title */}
-                <div className="h-8 md:h-10 w-3/4 bg-gray-200 rounded animate-pulse mb-4"></div>
-
-                {/* Organizer */}
-                <div className="flex items-center gap-3">
-                  <div className="h-4 w-4 rounded-full bg-gray-200 animate-pulse"></div>
-                  <div className="h-4 w-32 bg-gray-200 rounded animate-pulse"></div>
-                </div>
-              </div>
-
-              {/* Info Grid (Date & Location) */}
-              <div className="flex gap-4 border-y border-gray-100 py-6">
-                <div className="flex-1 flex gap-3">
-                  <div className="w-10 h-10 rounded-full bg-gray-200 animate-pulse"></div>
-                  <div className="space-y-2 w-full">
-                    <div className="h-3 w-16 bg-gray-200 rounded animate-pulse"></div>
-                    <div className="h-4 w-3/4 bg-gray-200 rounded animate-pulse"></div>
-                  </div>
-                </div>
-                <div className="flex-1 flex gap-3">
-                  <div className="w-10 h-10 rounded-full bg-gray-200 animate-pulse"></div>
-                  <div className="space-y-2 w-full">
-                    <div className="h-3 w-16 bg-gray-200 rounded animate-pulse"></div>
-                    <div className="h-4 w-3/4 bg-gray-200 rounded animate-pulse"></div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Description */}
-              <div className="space-y-3">
-                <div className="h-6 w-32 bg-gray-200 rounded animate-pulse mb-4"></div>
-                <div className="h-4 w-full bg-gray-200 rounded animate-pulse"></div>
-                <div className="h-4 w-full bg-gray-200 rounded animate-pulse"></div>
-                <div className="h-4 w-2/3 bg-gray-200 rounded animate-pulse"></div>
-              </div>
+              <div className="h-8 md:h-10 w-3/4 bg-gray-200 rounded animate-pulse mb-4"></div>
+              <div className="h-4 w-full bg-gray-200 rounded animate-pulse"></div>
             </div>
-
-            {/* 4. KANAN: Booking Card Skeleton */}
             <div className="lg:col-span-4">
-              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 h-[400px]">
-                <div className="h-4 w-24 bg-gray-200 rounded animate-pulse mb-2"></div>
-                <div className="h-8 w-48 bg-gray-200 rounded animate-pulse mb-8"></div>
-
-                {/* List Tiket Skeleton */}
-                <div className="space-y-3 mb-8">
-                  <div className="h-16 w-full bg-gray-200 rounded-xl animate-pulse"></div>
-                  <div className="h-16 w-full bg-gray-200 rounded-xl animate-pulse"></div>
-                </div>
-
-                <div className="h-12 w-full bg-gray-200 rounded-xl animate-pulse"></div>
-              </div>
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 h-[400px] animate-pulse"></div>
             </div>
           </div>
         </main>
@@ -200,14 +164,16 @@ export default function EventDetailPage() {
       </div>
     );
   }
+
   if (!event) return null;
 
+  // --- TAMPILAN UTAMA ---
   return (
     <div className="min-h-screen bg-gray-50 pt-28 flex flex-col font-['Poppins']">
       <Navbar />
 
       <main className="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full mb-24">
-        {/* Breadcrumb & Hero */}
+        {/* Breadcrumb & Hero Image */}
         <div className="mb-8 animate-fade-in-up">
           <div className="flex items-center gap-2 text-sm text-gray-500 mb-4">
             <span
@@ -235,7 +201,7 @@ export default function EventDetailPage() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
-          {/* KIRI: Info Event */}
+          {/* KOLOM KIRI: Detail Event */}
           <div className="lg:col-span-8 space-y-8 animate-fade-in-left">
             <div>
               <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2 leading-tight">
@@ -260,7 +226,9 @@ export default function EventDetailPage() {
                     <p className="text-sm font-semibold text-gray-800">
                       {formatDate(event.date)}
                     </p>
-                    <p className="text-xs text-gray-500">{event.time} WIB</p>
+                    <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1">
+                      <Clock size={10} /> {event.time} WIB
+                    </p>
                   </div>
                 </div>
                 <div className="flex items-start gap-3 flex-1">
@@ -280,15 +248,15 @@ export default function EventDetailPage() {
               </div>
             </div>
 
-            <div className="prose max-w-none text-gray-600 text-sm leading-relaxed">
+            <div className="prose max-w-none text-gray-600 text-sm leading-relaxed whitespace-pre-line">
               <h3 className="text-lg font-bold text-gray-900 mb-3">
                 Deskripsi Event
               </h3>
-              <p>{event.description}</p>
+              {event.description}
             </div>
           </div>
 
-          {/* KANAN: Booking Card (Sticky) */}
+          {/* KOLOM KANAN: Kartu Pembelian (Sticky) */}
           <div className="lg:col-span-4 animate-fade-in-right">
             <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 sticky top-28">
               <div className="mb-6">
@@ -302,7 +270,7 @@ export default function EventDetailPage() {
                 </h3>
               </div>
 
-              {/* --- LIST TIKET DARI API --- */}
+              {/* List Pilihan Tiket */}
               <div className="space-y-3 mb-6">
                 <p className="text-sm font-bold text-gray-800">Pilih Tiket</p>
 
@@ -319,18 +287,18 @@ export default function EventDetailPage() {
                           !isSoldOut && setSelectedTicketId(ticket.id)
                         }
                         className={`
-                                    border rounded-xl p-3 cursor-pointer transition-all relative
-                                    ${
-                                      isSelected
-                                        ? "border-[#026DA7] bg-blue-50 ring-1 ring-[#026DA7]"
-                                        : "border-gray-200 hover:border-gray-300 bg-white"
-                                    }
-                                    ${
-                                      isSoldOut
-                                        ? "opacity-50 cursor-not-allowed bg-gray-50"
-                                        : ""
-                                    }
-                                  `}
+                            border rounded-xl p-3 cursor-pointer transition-all relative
+                            ${
+                              isSelected
+                                ? "border-[#026DA7] bg-blue-50 ring-1 ring-[#026DA7]"
+                                : "border-gray-200 hover:border-gray-300 bg-white"
+                            }
+                            ${
+                              isSoldOut
+                                ? "opacity-50 cursor-not-allowed bg-gray-50"
+                                : ""
+                            }
+                        `}
                       >
                         <div className="flex justify-between items-center">
                           <div>
@@ -365,7 +333,7 @@ export default function EventDetailPage() {
                 )}
               </div>
 
-              {/* --- JUMLAH --- */}
+              {/* Kontrol Jumlah */}
               {selectedTicketData && (
                 <div className="flex items-center justify-between p-3 border border-gray-200 rounded-xl mb-6">
                   <span className="text-sm font-medium text-gray-700">
@@ -392,6 +360,7 @@ export default function EventDetailPage() {
                 </div>
               )}
 
+              {/* Tombol Beli */}
               <button
                 onClick={handleBuy}
                 disabled={!selectedTicketData || tickets.length === 0}

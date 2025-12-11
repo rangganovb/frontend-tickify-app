@@ -1,71 +1,85 @@
 import api from "../api/axiosInstance";
 
 export const eventService = {
-  // 1. GET ALL EVENTS
-  getEvents: async (filters = {}) => {
+  // Mengambil daftar event publik dengan dukungan filter dan sorting otomatis
+  getEvents: async (params = {}) => {
     try {
-      // Parameter Request
-      const params = {
-        title: filters.search,
-        category: filters.category,
-        location: filters.location,
-        min_price: filters.minPrice,
-        date: filters.date,
-        limit: 50,
-        page: 1,
-      };
+      const finalParams = { limit: 100, ...params };
+      const response = await api.get("/events", { params: finalParams });
 
-      // Hapus parameter yang kosong/undefined
-      Object.keys(params).forEach((key) => !params[key] && delete params[key]);
+      const rawData = Array.isArray(response.data)
+        ? response.data
+        : response.data?.data || [];
 
-      // Tembak API
-      const response = await api.get("/events", { params });
+      const detailedData = await Promise.all(
+        rawData.map(async (ev) => {
+          try {
+            // Tembak endpoint tiket untuk setiap event
+            const ticketRes = await api.get(`/tickets/event/${ev.id}`);
+            const tickets = Array.isArray(ticketRes.data)
+              ? ticketRes.data
+              : ticketRes.data?.data || [];
 
-      // --- LOGIC BUKA BUNGKUS DATA ---
-      const eventsArray = response.data.data;
+            // Masukkan data tiket ke dalam object event agar helper 'transformEventData' bisa hitung harganya
+            return { ...ev, tickets };
+          } catch (err) {
+            // Kalau gagal ambil tiket, biarkan harga default
+            return ev;
+          }
+        })
+      );
 
-      // Validasi
-      if (!Array.isArray(eventsArray)) {
-        console.warn(
-          "Format response tidak sesuai ekspektasi array:",
-          response.data
-        );
-        return [];
-      }
+      const transformedData = detailedData.map(transformEventData);
 
-      // Format data sesuai kebutuhan UI (EventCard)
-      return eventsArray.map(transformEventData);
+      // Mengurutkan event berdasarkan waktu mulai secara menurun (terbaru/masa depan di atas)
+      const sortedData = transformedData.sort((a, b) => {
+        const dateA = new Date(a.start_time_raw || 0);
+        const dateB = new Date(b.start_time_raw || 0);
+        return dateB - dateA;
+      });
+
+      return sortedData;
     } catch (error) {
       console.error("Gagal ambil events:", error);
       return [];
     }
   },
 
-  // 2. GET EVENT BY ID
+  // Mengambil detail satu event berdasarkan ID dengan penanganan format respons dinamis
   getEventById: async (id) => {
     try {
       const response = await api.get(`/events/${id}`);
-      const eventData = response.data.data || response.data;
-      return transformEventData(eventData);
+
+      // Menangani variasi struktur respons (data, data.data, atau data.event)
+      let rawData = response.data;
+      if (response.data.data) {
+        rawData = response.data.data;
+      } else if (response.data.event) {
+        rawData = response.data.event;
+      }
+
+      if (!rawData || !rawData.id) {
+        throw new Error("Data event tidak lengkap atau tidak ditemukan");
+      }
+
+      return transformEventData(rawData);
     } catch (error) {
       console.error("Gagal ambil detail event:", error);
       throw error;
     }
   },
 
-  // 3. GET TICKETS
-  getEventTickets: async (eventId) => {
+  // Mengambil 5 event unggulan/terbaru untuk ditampilkan di beranda
+  getFeaturedEvents: async () => {
     try {
-      const response = await api.get(`/tickets/event/${eventId}`);
-      // Handle wrapper data juga untuk tiket
-      return response.data.data || response.data;
+      const events = await eventService.getEvents();
+      return events.slice(0, 5);
     } catch (error) {
-      console.error("Gagal ambil tiket:", error);
       return [];
     }
   },
 
-  // 4. GET MY TICKETS
+  // Mengambil daftar tiket yang dimiliki user saat ini
   getMyTickets: async (page = 1, limit = 10) => {
     try {
       const response = await api.get("/tickets/mine", {
@@ -81,51 +95,148 @@ export const eventService = {
     }
   },
 
-  // 5. GET TICKET DETAIL (Baru)
+  // Mengambil detail spesifik satu tiket yang sudah dibeli
   getTicketDetail: async (ticketId) => {
     try {
       const response = await api.get(`/tickets/${ticketId}`);
-      // Handle response wrapper (jika ada data.data)
-      return response.data.data || response.data;
+      return response.data.data || response.data.ticket || response.data;
     } catch (error) {
       console.error("Gagal ambil detail tiket:", error);
       throw error;
     }
   },
+
+  // Membuat event baru (Khusus Admin) dengan dukungan upload gambar
+  createEvent: async (formData) => {
+    try {
+      const config = { headers: { "Content-Type": "multipart/form-data" } };
+      const response = await api.post("/admin/events", formData, config);
+      return response.data;
+    } catch (error) {
+      console.error("Gagal create event:", error);
+      throw error;
+    }
+  },
+
+  // Memperbarui data event yang sudah ada (Khusus Admin)
+  updateEvent: async (id, formData) => {
+    try {
+      const config = { headers: { "Content-Type": "multipart/form-data" } };
+      const response = await api.put(`/admin/events/${id}`, formData, config);
+      return response.data;
+    } catch (error) {
+      console.error("Gagal update event:", error);
+      throw error;
+    }
+  },
+
+  // Menghapus event secara permanen (Khusus Admin)
+  deleteEvent: async (id) => {
+    try {
+      const response = await api.delete(`/admin/events/${id}`);
+      return response.data;
+    } catch (error) {
+      console.error("Gagal delete event:", error);
+      throw error;
+    }
+  },
+
+  // Mengambil daftar kategori tiket berdasarkan ID event (Public & Admin)
+  getTicketsByEvent: async (eventId) => {
+    try {
+      const response = await api.get(`/tickets/event/${eventId}`);
+      return Array.isArray(response.data)
+        ? response.data
+        : response.data.data || [];
+    } catch (error) {
+      console.error("Gagal ambil tiket event:", error);
+      return [];
+    }
+  },
+
+  // Membuat kategori tiket baru untuk event tertentu (Khusus Admin)
+  createTicket: async (payload) => {
+    try {
+      const response = await api.post("/admin/tickets", payload);
+      return response.data;
+    } catch (error) {
+      console.error("Gagal buat tiket:", error);
+      throw error;
+    }
+  },
+
+  // Memperbarui data kategori tiket (Khusus Admin)
+  updateTicket: async (id, payload) => {
+    try {
+      const response = await api.put(`/admin/tickets/${id}`, payload);
+      return response.data;
+    } catch (error) {
+      console.error("Gagal update tiket:", error);
+      throw error;
+    }
+  },
+
+  // Menghapus kategori tiket (Khusus Admin)
+  deleteTicket: async (id) => {
+    try {
+      await api.delete(`/admin/tickets/${id}`);
+    } catch (error) {
+      console.error("Gagal hapus tiket:", error);
+      throw error;
+    }
+  },
 };
 
-// --- HELPER: MAPPING DATA BACKEND -> FRONTEND ---
+// Helper: Mengubah format data raw backend menjadi format UI yang konsisten
 const transformEventData = (item) => {
+  if (!item) return {};
+
+  // Logika penentuan harga terendah dari daftar tiket atau harga dasar
+  let bestPrice = parseFloat(item.price || 0);
+
+  if (item.tickets && Array.isArray(item.tickets) && item.tickets.length > 0) {
+    const prices = item.tickets.map((t) => parseFloat(t.price));
+    bestPrice = Math.min(...prices);
+  }
+
+  // Normalisasi harga jika nilai di bawah 1000 (asumsi format ribuan desimal)
+  if (bestPrice > 0 && bestPrice < 1000) {
+    bestPrice = bestPrice * 1000;
+  }
+
   return {
     id: item.id,
-
-    // Data Text
     title: item.title,
     description: item.description,
     location: item.location || "Lokasi Belum Ditentukan",
     venue: item.venue || "",
 
-    // Data Waktu (Parse dari ISO String)
-    date: item.start_time
-      ? item.start_time.split("T")[0]
-      : new Date().toISOString().split("T")[0],
-    time: item.start_time
-      ? item.start_time.split("T")[1].substring(0, 5)
-      : "19:00",
+    // Menyimpan data waktu mentah untuk keperluan sorting dan form edit
+    start_time_raw: item.start_time,
+    end_time_raw: item.end_time,
 
-    // Data Gambar (Banner URL)
+    // Format tanggal dan waktu untuk tampilan UI (Kartu/Detail)
+    date: item.start_time
+      ? new Date(item.start_time).toLocaleDateString("id-ID", {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+        })
+      : "Segera",
+    time: item.start_time
+      ? new Date(item.start_time).toLocaleTimeString("id-ID", {
+          hour: "2-digit",
+          minute: "2-digit",
+        })
+      : "TBA",
+
     image:
       item.banner_url ||
+      item.image ||
       "https://images.unsplash.com/photo-1501281668745-f7f57925c3b4",
-
-    // Data Tambahan (Organizer & Category) - SUDAH REAL DARI BE
+    price: bestPrice,
     organizer: item.organizer_name || "Tickify Partner",
     category: item.category || "others",
-
-    // Harga (Masih Random karena di object event belum ada field 'price')
-    price:
-      item.price || Math.floor(Math.random() * (500 - 100 + 1) + 100) * 1000,
-
-    stock: 100, // Dummy
+    stock: 100,
   };
 };
