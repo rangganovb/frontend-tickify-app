@@ -6,8 +6,9 @@ import { Footer } from "../../components/layout/Footer";
 import { eventService } from "../../services/eventServices";
 import { userService } from "../../services/userService";
 import { EventFormModal } from "../../components/features/EventFormModal";
-import { UserFormModal } from "../../components/features/UserFormModal"; // Import Modal User
+import { UserFormModal } from "../../components/features/UserFormModal";
 import { toast } from "react-hot-toast";
+
 import {
   LayoutDashboard,
   Calendar,
@@ -25,6 +26,8 @@ import {
   Mail,
   AlertTriangle,
   X,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 
 export default function AdminProfilePage() {
@@ -53,6 +56,19 @@ export default function AdminProfilePage() {
     type: "danger",
     onConfirm: null,
   });
+
+  // Pagination khusus untuk event
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
+  // Hitung total halaman
+  const totalPages = Math.ceil(events.length / itemsPerPage);
+
+  // Data event untuk halaman aktif
+  const paginatedEvents = events.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
 
   const user = JSON.parse(localStorage.getItem("user") || "{}");
 
@@ -411,7 +427,7 @@ export default function AdminProfilePage() {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
-                          {events.map((ev) => (
+                          {paginatedEvents.map((ev) => (
                             <tr
                               key={ev.id}
                               className="hover:bg-gray-50/50 transition-colors group"
@@ -475,6 +491,38 @@ export default function AdminProfilePage() {
                       </div>
                     )}
                   </div>
+                  {/* PAGINATION (letakkan di SINI) */}
+                  {totalPages > 1 && (
+                    <div className="flex items-center justify-center gap-6 py-6">
+                      <button
+                        disabled={currentPage === 1}
+                        onClick={() => setCurrentPage((p) => p - 1)}
+                        className={`px-4 py-2 rounded-xl border text-sm font-medium transition-all ${
+                          currentPage === 1
+                            ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                            : "bg-white text-gray-700 hover:bg-gray-50"
+                        }`}
+                      >
+                        Previous
+                      </button>
+
+                      <span className="text-sm font-semibold text-gray-700">
+                        Page {currentPage} of {totalPages}
+                      </span>
+
+                      <button
+                        disabled={currentPage === totalPages}
+                        onClick={() => setCurrentPage((p) => p + 1)}
+                        className={`px-4 py-2 rounded-xl border text-sm font-medium transition-all ${
+                          currentPage === totalPages
+                            ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                            : "bg-white text-gray-700 hover:bg-gray-50"
+                        }`}
+                      >
+                        Next
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
 

@@ -73,7 +73,7 @@ export default function AboutPage() {
             {/* Stat Item 1 */}
             <div className="group">
               <h3 className="font-['Poppins'] font-bold text-4xl md:text-5xl text-[#1D3A6B] mb-2 group-hover:text-[#026DA7] transition-colors">
-                3 jt+
+                300,000+
               </h3>
               <p className="text-gray-500 font-['Poppins'] text-sm font-medium tracking-wide">
                 Tiket Terjual
@@ -93,7 +93,7 @@ export default function AboutPage() {
             {/* Stat Item 3 */}
             <div className="group">
               <h3 className="font-['Poppins'] font-bold text-4xl md:text-5xl text-[#1D3A6B] mb-2 group-hover:text-[#026DA7] transition-colors">
-                50+
+                30+
               </h3>
               <p className="text-gray-500 font-['Poppins'] text-sm font-medium tracking-wide">
                 Kota Terjangkau

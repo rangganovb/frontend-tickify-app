@@ -14,6 +14,7 @@ import EventDetailPage from "./pages/main/EventDetailPage";
 import CheckoutPage from "./pages/transaction/CheckoutPage";
 import PaymentPage from "./pages/transaction/PaymentPage";
 import AdminProfilePage from "./pages/admin/AdminProfilePage";
+import UserProfilePage from "./pages/user/UserProfilePage";
 
 function App() {
   const [isLoading, setIsLoading] = useState(true);
@@ -77,7 +78,7 @@ function App() {
           <Route path="/contact" element={<ContactPage />} />
 
           {/* User Pages */}
-          <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/profile" element={<UserProfilePage />} />
 
           {/* ... (Placeholder / 404) ... */}
 
@@ -87,6 +88,9 @@ function App() {
 
           {/* --- Admin Pages --- */}
           <Route path="/admin/dashboard" element={<AdminProfilePage />} />
+
+          {/* Route untuk Redirect Xendit */}
+          <Route path="/my-tickets" element={<UserProfilePage />} />
         </Routes>
       </div>
     </BrowserRouter>

@@ -75,10 +75,10 @@ export default function LandingPage() {
   ];
 
   const stats = [
-    { value: "1,000+", label: "User Terdaftar" },
-    { value: "50,000+", label: "Transaksi Sukses" },
-    { value: "100,000+", label: "Tiket Terjual" },
-    { value: "50+", label: "Kota di Indonesia" },
+    { value: "50,000+", label: "User Terdaftar" },
+    { value: "150,000+", label: "Transaksi Sukses" },
+    { value: "300,000", label: "Tiket Terjual" },
+    { value: "30+", label: "Kota di Indonesia" },
   ];
 
   return (

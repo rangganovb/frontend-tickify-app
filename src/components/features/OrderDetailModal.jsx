@@ -130,7 +130,7 @@ export const OrderDetailModal = ({ orderId, onClose }) => {
               {/* Items List (Table-like structure) */}
               <div>
                 <h4 className="text-sm font-bold text-gray-800 mb-4 flex items-center gap-2">
-                  <Package size={16} className="text-[#026DA7]" /> Item Pesanan
+                  <Package size={16} className="text-[#026DA7]" /> Tiket Pesanan
                 </h4>
                 <div className="bg-gray-50 rounded-xl p-4 border border-gray-100 space-y-4">
                   {order.items?.map((item) => (
