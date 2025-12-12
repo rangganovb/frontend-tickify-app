@@ -338,7 +338,7 @@ export const EventFormModal = ({ eventId, onClose, onSuccess }) => {
                     <option value="talkshow">Talkshow</option>
                     <option value="sports">Olahraga</option>
                     <option value="workshop">Workshop</option>
-                    <option value="seminar">Seminar</option>
+                    <option value="competition">Kompetisi</option>
                   </select>
                 </div>
 

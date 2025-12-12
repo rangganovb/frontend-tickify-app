@@ -491,7 +491,7 @@ export default function AdminProfilePage() {
                       </div>
                     )}
                   </div>
-                  {/* PAGINATION (letakkan di SINI) */}
+                  {/* PAGINATION */}
                   {totalPages > 1 && (
                     <div className="flex items-center justify-center gap-6 py-6">
                       <button

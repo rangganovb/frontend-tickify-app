@@ -73,7 +73,7 @@ export default function HomePage() {
                 Top Markotop
               </h2>
               <p className="text-white/80 mt-2 font-medium">
-                Event paling panas minggu ini yang wajib kamu datangi!
+                Event paling hits yang wajib kamu datangi!
               </p>
             </div>
             <TopMarkotop events={events} />
