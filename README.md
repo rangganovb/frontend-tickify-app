@@ -107,7 +107,7 @@ TICKIFY-APP/
 │   │   ├── orderService.js      # Service untuk Transaksi/Order
 │   │   └── userService.js       # Service untuk data User
 │   │
-│   ├── 📂 utils/                # Fungsi bantuan (Utilities)
+│   |
 │   ├── App.js                   # Konfigurasi Routing & Component Utama
 │   ├── index.js                 # Entry Point Aplikasi (React DOM Render)
 │   └── App.css / index.css      # Global Styling
