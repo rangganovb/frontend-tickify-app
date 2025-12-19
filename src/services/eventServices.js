@@ -1,38 +1,134 @@
 import api from "../api/axiosInstance";
 
 export const eventService = {
-  // Mengambil daftar event publik dengan dukungan filter dan sorting otomatis
+  // 1. GET ALL EVENTS (Public)
   getEvents: async (params = {}) => {
     try {
-      const finalParams = { limit: 100, ...params };
+      const finalParams = { limit: 100 };
       const response = await api.get("/events", { params: finalParams });
 
       const rawData = Array.isArray(response.data)
         ? response.data
         : response.data?.data || [];
 
+      // A. FETCH DATA TIKET UNTUK SETIAP EVENT
       const detailedData = await Promise.all(
         rawData.map(async (ev) => {
           try {
-            // Tembak endpoint tiket untuk setiap event
             const ticketRes = await api.get(`/tickets/event/${ev.id}`);
             const tickets = Array.isArray(ticketRes.data)
               ? ticketRes.data
               : ticketRes.data?.data || [];
 
-            // Masukkan data tiket ke dalam object event agar helper 'transformEventData' bisa hitung harganya
             return { ...ev, tickets };
           } catch (err) {
-            // Kalau gagal ambil tiket, biarkan harga default
             return ev;
           }
         })
       );
 
+      // B. TRANSFORM DATA (Hitung harga & format tanggal)
       const transformedData = detailedData.map(transformEventData);
 
-      // Mengurutkan event berdasarkan waktu mulai secara menurun (terbaru/masa depan di atas)
-      const sortedData = transformedData.sort((a, b) => {
+      // C. FILTER SISI CLIENT
+
+      let filteredData = transformedData;
+
+      // 1. Filter kategori
+      if (params.category && params.category !== "all") {
+        filteredData = filteredData.filter(
+          (event) =>
+            event.category?.toLowerCase() === params.category.toLowerCase()
+        );
+      }
+
+      // 2. Filter harga maksimal
+      if (params.maxPrice) {
+        const cleanPrice = String(params.maxPrice).replace(/[.,]/g, "");
+        const maxPrice = Number(cleanPrice);
+        filteredData = filteredData.filter((event) => event.price <= maxPrice);
+      }
+
+      // 3. Filter Tanggal Event
+      if (params.date) {
+        const filterType = params.date;
+        const now = new Date();
+        now.setHours(0, 0, 0, 0);
+
+        filteredData = filteredData.filter((event) => {
+          if (!event.start_time_raw) return false;
+
+          const eventDate = new Date(event.start_time_raw);
+          eventDate.setHours(0, 0, 0, 0);
+
+          switch (filterType) {
+            case "today": // Hari ini
+              return eventDate.getTime() === now.getTime();
+
+            case "tomorrow": // Besok
+              const tomorrow = new Date(now);
+              tomorrow.setDate(tomorrow.getDate() + 1);
+              return eventDate.getTime() === tomorrow.getTime();
+
+            case "this_week": // Minggu ini (Senin - Minggu)
+              const dayOfWeek = now.getDay() || 7;
+              const startOfWeek = new Date(now);
+              startOfWeek.setDate(now.getDate() - dayOfWeek + 1);
+
+              const endOfWeek = new Date(startOfWeek);
+              endOfWeek.setDate(startOfWeek.getDate() + 6);
+
+              return eventDate >= startOfWeek && eventDate <= endOfWeek;
+
+            case "next_week": // Minggu depan (Senin - Minggu)
+              const startNextWeek = new Date(now);
+              const dayNext = startNextWeek.getDay() || 7;
+              startNextWeek.setDate(startNextWeek.getDate() - dayNext + 1 + 7); // Senin minggu depan
+
+              const endNextWeek = new Date(startNextWeek);
+              endNextWeek.setDate(startNextWeek.getDate() + 6); // Minggu depan
+
+              return eventDate >= startNextWeek && eventDate <= endNextWeek;
+
+            case "this_month": // Bulan ini
+              return (
+                eventDate.getMonth() === now.getMonth() &&
+                eventDate.getFullYear() === now.getFullYear()
+              );
+
+            case "next_month": // Bulan depan
+              const nextMonth = new Date(now);
+              nextMonth.setMonth(nextMonth.getMonth() + 1);
+              return (
+                eventDate.getMonth() === nextMonth.getMonth() &&
+                eventDate.getFullYear() === nextMonth.getFullYear()
+              );
+
+            default:
+              // Fallback: Filter tanggal spesifik manual (YYYY-MM-DD)
+              const specificDate = new Date(filterType);
+              if (!isNaN(specificDate.getTime())) {
+                specificDate.setHours(0, 0, 0, 0);
+                return eventDate.getTime() === specificDate.getTime();
+              }
+              return true;
+          }
+        });
+      }
+
+      // 4. Filter pencarian (search keyword)
+      if (params.keyword) {
+        const keyword = params.keyword.toLowerCase();
+
+        filteredData = filteredData.filter(
+          (event) =>
+            event.title.toLowerCase().includes(keyword) ||
+            event.location.toLowerCase().includes(keyword)
+        );
+      }
+
+      // D. SORTING TERBARU — EVENT MASA DEPAN DI URUTKAN ATAS
+      const sortedData = filteredData.sort((a, b) => {
         const dateA = new Date(a.start_time_raw || 0);
         const dateB = new Date(b.start_time_raw || 0);
         return dateB - dateA;
@@ -45,12 +141,11 @@ export const eventService = {
     }
   },
 
-  // Mengambil detail satu event berdasarkan ID dengan penanganan format respons dinamis
+  // 2. GET EVENT BY ID
   getEventById: async (id) => {
     try {
       const response = await api.get(`/events/${id}`);
 
-      // Menangani variasi struktur respons (data, data.data, atau data.event)
       let rawData = response.data;
       if (response.data.data) {
         rawData = response.data.data;
@@ -69,7 +164,7 @@ export const eventService = {
     }
   },
 
-  // Mengambil 5 event unggulan/terbaru untuk ditampilkan di beranda
+  // 3. GET 5 FEATURED EVENTS
   getFeaturedEvents: async () => {
     try {
       const events = await eventService.getEvents();
@@ -79,7 +174,7 @@ export const eventService = {
     }
   },
 
-  // Mengambil daftar tiket yang dimiliki user saat ini
+  // 4. GET MY TICKETS
   getMyTickets: async (page = 1, limit = 10) => {
     try {
       const response = await api.get("/tickets/mine", {
@@ -95,7 +190,7 @@ export const eventService = {
     }
   },
 
-  // Mengambil detail spesifik satu tiket yang sudah dibeli
+  // 5. TICKET DETAIL
   getTicketDetail: async (ticketId) => {
     try {
       const response = await api.get(`/tickets/${ticketId}`);
@@ -106,7 +201,7 @@ export const eventService = {
     }
   },
 
-  // Membuat event baru (Khusus Admin) dengan dukungan upload gambar
+  // 6. CRUD EVENT
   createEvent: async (formData) => {
     try {
       const config = { headers: { "Content-Type": "multipart/form-data" } };
@@ -118,7 +213,6 @@ export const eventService = {
     }
   },
 
-  // Memperbarui data event yang sudah ada (Khusus Admin)
   updateEvent: async (id, formData) => {
     try {
       const config = { headers: { "Content-Type": "multipart/form-data" } };
@@ -130,7 +224,6 @@ export const eventService = {
     }
   },
 
-  // Menghapus event secara permanen (Khusus Admin)
   deleteEvent: async (id) => {
     try {
       const response = await api.delete(`/admin/events/${id}`);
@@ -141,7 +234,7 @@ export const eventService = {
     }
   },
 
-  // Mengambil daftar kategori tiket berdasarkan ID event (Public & Admin)
+  // 7. CRUD TICKET
   getTicketsByEvent: async (eventId) => {
     try {
       const response = await api.get(`/tickets/event/${eventId}`);
@@ -154,7 +247,6 @@ export const eventService = {
     }
   },
 
-  // Membuat kategori tiket baru untuk event tertentu (Khusus Admin)
   createTicket: async (payload) => {
     try {
       const response = await api.post("/admin/tickets", payload);
@@ -165,7 +257,6 @@ export const eventService = {
     }
   },
 
-  // Memperbarui data kategori tiket (Khusus Admin)
   updateTicket: async (id, payload) => {
     try {
       const response = await api.put(`/admin/tickets/${id}`, payload);
@@ -176,7 +267,6 @@ export const eventService = {
     }
   },
 
-  // Menghapus kategori tiket (Khusus Admin)
   deleteTicket: async (id) => {
     try {
       await api.delete(`/admin/tickets/${id}`);
@@ -187,11 +277,10 @@ export const eventService = {
   },
 };
 
-// Helper: Mengubah format data raw backend menjadi format UI yang konsisten
+// HELPER: transformEventData
 const transformEventData = (item) => {
   if (!item) return {};
 
-  // Logika penentuan harga terendah dari daftar tiket atau harga dasar
   let bestPrice = parseFloat(item.price || 0);
 
   if (item.tickets && Array.isArray(item.tickets) && item.tickets.length > 0) {
@@ -199,7 +288,6 @@ const transformEventData = (item) => {
     bestPrice = Math.min(...prices);
   }
 
-  // Normalisasi harga jika nilai di bawah 1000 (asumsi format ribuan desimal)
   if (bestPrice > 0 && bestPrice < 1000) {
     bestPrice = bestPrice * 1000;
   }
@@ -210,12 +298,8 @@ const transformEventData = (item) => {
     description: item.description,
     location: item.location || "Lokasi Belum Ditentukan",
     venue: item.venue || "",
-
-    // Menyimpan data waktu mentah untuk keperluan sorting dan form edit
     start_time_raw: item.start_time,
     end_time_raw: item.end_time,
-
-    // Format tanggal dan waktu untuk tampilan UI (Kartu/Detail)
     date: item.start_time
       ? new Date(item.start_time).toLocaleDateString("id-ID", {
           day: "numeric",
@@ -229,7 +313,6 @@ const transformEventData = (item) => {
           minute: "2-digit",
         })
       : "TBA",
-
     image:
       item.banner_url ||
       item.image ||

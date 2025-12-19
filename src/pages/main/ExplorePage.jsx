@@ -16,14 +16,12 @@ export default function ExplorePage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
-  // --- STATE ---
+  // --- STATE MANAGEMENT ---
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
-
-  // --- STATE BARU: LAZY LOADING ---
   const [visibleLimit, setVisibleLimit] = useState(8);
 
-  // UI Controls
+  // UI State
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [isSortOpen, setIsSort] = useState(false);
 
@@ -32,19 +30,20 @@ export default function ExplorePage() {
     search: "",
     location: "",
     category: "",
-    minPrice: "",
+    maxPrice: "",
     date: "",
   });
   const [sortOption, setSortOption] = useState("newest");
 
+  // Cek apakah ada filter aktif untuk tombol Reset
   const hasActiveFilters =
     filters.search !== "" ||
     filters.location !== "" ||
     filters.category !== "" ||
-    filters.minPrice !== "" ||
+    filters.maxPrice !== "" ||
     filters.date !== "";
 
-  // --- 1. INITIAL SETUP ---
+  // 1. INISIALISASI DARI URL PARAMETERS
   useEffect(() => {
     const searchParam = searchParams.get("q");
     const catParam = searchParams.get("category");
@@ -58,43 +57,23 @@ export default function ExplorePage() {
     if (catParam) setIsFilterOpen(true);
   }, [searchParams]);
 
-  // --- 2. FETCHING DATA & CLIENT-SIDE FILTERING ---
+  // 2. FETCH DATA & FILTERING
   useEffect(() => {
     const fetchFilteredData = async () => {
       setLoading(true);
 
       const payload = {
-        ...filters,
+        keyword: filters.search,
+        category: filters.category,
+        maxPrice: filters.maxPrice,
+        date: filters.date,
         sortBy: sortOption,
       };
 
       try {
-        // 1. Ambil data dari API (Mungkin BE balikin semua data)
         let data = await eventService.getEvents(payload);
 
-        // --- 2. LOGIC FILTERING FRONTEND (BACKUP) ---
-        // Kita filter lagi di sini untuk memastikan data sesuai keinginan
-
-        // A. Filter Kategori
-        if (filters.category && filters.category !== "") {
-          data = data.filter(
-            (ev) =>
-              ev.category?.toLowerCase() === filters.category.toLowerCase()
-          );
-        }
-
-        // B. Filter Search (Judul / Lokasi)
-        if (filters.search) {
-          const q = filters.search.toLowerCase();
-          data = data.filter(
-            (ev) =>
-              ev.title?.toLowerCase().includes(q) ||
-              ev.location?.toLowerCase().includes(q) ||
-              ev.venue?.toLowerCase().includes(q)
-          );
-        }
-
-        // C. Filter Lokasi (Dropdown)
+        // Filter Spesifik: Lokasi
         if (filters.location) {
           data = data.filter((ev) =>
             ev.location?.toLowerCase().includes(filters.location.toLowerCase())
@@ -102,11 +81,9 @@ export default function ExplorePage() {
         }
 
         setEvents(data);
-
-        // Reset Lazy Load
         setVisibleLimit(8);
       } catch (error) {
-        console.error("Gagal fetch events:", error);
+        console.error("ExplorePage: Gagal mengambil data events.", error);
         setEvents([]);
       } finally {
         setLoading(false);
@@ -120,21 +97,21 @@ export default function ExplorePage() {
     return () => clearTimeout(timeoutId);
   }, [filters, sortOption]);
 
+  // --- EVENT HANDLERS ---
+
   const clearFilters = () => {
     setFilters({
       search: "",
       location: "",
       category: "",
-      minPrice: "",
+      maxPrice: "",
       date: "",
     });
     setSortOption("newest");
     navigate("/explore", { replace: true });
   };
 
-  // --- FUNGSI LOAD MORE ---
   const handleLoadMore = () => {
-    // Tambah 8 kartu lagi setiap diklik
     setVisibleLimit((prev) => prev + 8);
   };
 
@@ -143,7 +120,7 @@ export default function ExplorePage() {
       <Navbar />
 
       <main className="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full mb-20">
-        {/* HEADER */}
+        {/* HEADER SECTION */}
         <div className="text-center mb-8">
           <h1 className="font-['Poppins'] font-bold text-3xl md:text-4xl text-[#1D3A6B] mb-2">
             {filters.search
@@ -157,9 +134,9 @@ export default function ExplorePage() {
           </p>
         </div>
 
-        {/* --- CONTROL BAR --- */}
+        {/* CONTROLS SECTION */}
         <div className="flex flex-row justify-between items-center gap-3 mb-8 bg-transparent">
-          {/* GROUP KIRI */}
+          {/* Kiri: Tombol Filter */}
           <div className="flex items-center gap-2">
             <button
               onClick={() => setIsFilterOpen(!isFilterOpen)}
@@ -187,7 +164,7 @@ export default function ExplorePage() {
             )}
           </div>
 
-          {/* GROUP KANAN */}
+          {/* Kanan: Tombol Sort */}
           <div className="relative">
             <button
               onClick={() => setIsSort(!isSortOpen)}
@@ -197,6 +174,7 @@ export default function ExplorePage() {
                 <SlidersHorizontal size={18} />
                 <span className="text-sm hidden md:block whitespace-nowrap">
                   {sortOption === "newest" && "Paling Baru"}
+                  {sortOption === "oldest" && "Paling Lama"}
                   {sortOption === "lowPrice" && "Harga Terendah"}
                   {sortOption === "highPrice" && "Harga Tertinggi"}
                 </span>
@@ -207,6 +185,7 @@ export default function ExplorePage() {
               <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-xl shadow-xl border border-gray-100 z-[60] overflow-hidden animate-fade-in origin-top-right">
                 {[
                   { val: "newest", label: "Paling Baru" },
+                  { val: "oldest", label: "Paling Lama" },
                   { val: "lowPrice", label: "Harga Terendah" },
                   { val: "highPrice", label: "Harga Tertinggi" },
                 ].map((opt) => (
@@ -230,7 +209,7 @@ export default function ExplorePage() {
           </div>
         </div>
 
-        {/* --- FILTER PANEL --- */}
+        {/* FILTER PANEL */}
         <div
           className={`overflow-hidden transition-all duration-500 ease-in-out ${
             isFilterOpen
@@ -240,7 +219,7 @@ export default function ExplorePage() {
         >
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col gap-6">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              {/* Lokasi */}
+              {/* Input: Lokasi */}
               <div className="space-y-2">
                 <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">
                   Lokasi
@@ -255,7 +234,7 @@ export default function ExplorePage() {
                   }
                 />
               </div>
-              {/* Kategori */}
+              {/* Input: Kategori */}
               <div className="space-y-2">
                 <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">
                   Kategori
@@ -277,7 +256,7 @@ export default function ExplorePage() {
                   <option value="competition">Kompetisi</option>
                 </select>
               </div>
-              {/* Waktu */}
+              {/* Input: Waktu */}
               <div className="space-y-2">
                 <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">
                   Waktu
@@ -291,13 +270,14 @@ export default function ExplorePage() {
                 >
                   <option value="">Semua Waktu</option>
                   <option value="today">Hari Ini</option>
+                  <option value="tomorrow">Besok</option>
                   <option value="this_week">Minggu Ini</option>
                   <option value="next_week">Minggu Depan</option>
                   <option value="this_month">Bulan Ini</option>
                   <option value="next_month">Bulan Depan</option>
                 </select>
               </div>
-              {/* Max Harga */}
+              {/* Input: Harga (Max Price) */}
               <div className="space-y-2">
                 <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">
                   Max Harga
@@ -306,9 +286,9 @@ export default function ExplorePage() {
                   type="number"
                   placeholder="Rp..."
                   className="w-full p-2 border-b border-gray-200 focus:border-[#026DA7] outline-none text-sm [appearance:textfield]"
-                  value={filters.minPrice}
+                  value={filters.maxPrice}
                   onChange={(e) =>
-                    setFilters({ ...filters, minPrice: e.target.value })
+                    setFilters({ ...filters, maxPrice: e.target.value })
                   }
                 />
               </div>
@@ -316,7 +296,7 @@ export default function ExplorePage() {
           </div>
         </div>
 
-        {/* EVENT GRID */}
+        {/* EVENT GRID DISPLAY */}
         {loading ? (
           <div className="text-center py-20 text-gray-400 animate-pulse">
             Memuat Event...
@@ -329,18 +309,16 @@ export default function ExplorePage() {
               ))}
             </div>
 
-            {/* TOMBOL LOAD MORE*/}
+            {/* Load More Button */}
             {visibleLimit < events.length && (
               <div className="mt-12 flex flex-col items-center">
                 <div className="w-full max-w-xs border-t border-gray-100 mb-8"></div>
-
                 <button
                   onClick={handleLoadMore}
                   className="px-10 py-3 rounded-full border border-gray-300 text-gray-600 text-sm font-medium hover:border-[#026DA7] hover:text-[#026DA7] hover:bg-blue-50/50 transition-all duration-300 tracking-wide"
                 >
                   Tampilkan Lebih Banyak
                 </button>
-
                 <p className="text-[11px] text-gray-400 mt-4 tracking-wide">
                   Menampilkan {Math.min(visibleLimit, events.length)} dari{" "}
                   {events.length} event
@@ -349,6 +327,7 @@ export default function ExplorePage() {
             )}
           </>
         ) : (
+          /* EMPTY STATE */
           <div className="text-center py-20">
             <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4 text-gray-400">
               <Search size={40} />
@@ -359,13 +338,13 @@ export default function ExplorePage() {
                 : "Tidak ada event ditemukan"}
             </h3>
             <p className="text-gray-500 text-sm mt-2">
-              Coba kata kunci lain atau reset filter kamu.
+              Event tidak tersedia untuk rentang waktu atau filter yang dipilih.
             </p>
             <button
               onClick={clearFilters}
               className="mt-6 px-6 py-2 bg-[#026DA7] text-white rounded-full font-medium hover:bg-[#025a8a] transition-colors"
             >
-              Lihat Semua Event
+              Reset Filter
             </button>
           </div>
         )}
