@@ -127,12 +127,42 @@ export const eventService = {
         );
       }
 
-      // D. SORTING TERBARU — EVENT MASA DEPAN DI URUTKAN ATAS
-      const sortedData = filteredData.sort((a, b) => {
-        const dateA = new Date(a.start_time_raw || 0);
-        const dateB = new Date(b.start_time_raw || 0);
-        return dateB - dateA;
-      });
+      // D. SORTING LOGIC
+      let sortedData = filteredData;
+
+      if (params.sortBy) {
+        sortedData.sort((a, b) => {
+          const dateA = new Date(a.start_time_raw || 0);
+          const dateB = new Date(b.start_time_raw || 0);
+
+          switch (params.sortBy) {
+            case "newest":
+              // Paling Baru
+              return dateB - dateA;
+
+            case "oldest":
+              // Paling Lama
+              return dateA - dateB;
+
+            case "lowPrice":
+              // Harga Terendah
+              return (a.price || 0) - (b.price || 0);
+
+            case "highPrice":
+              // Harga Tertinggi
+              return (b.price || 0) - (a.price || 0);
+
+            default:
+              return dateB - dateA;
+          }
+        });
+      } else {
+        sortedData.sort((a, b) => {
+          const dateA = new Date(a.start_time_raw || 0);
+          const dateB = new Date(b.start_time_raw || 0);
+          return dateB - dateA;
+        });
+      }
 
       return sortedData;
     } catch (error) {
