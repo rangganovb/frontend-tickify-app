@@ -173,8 +173,8 @@ export default function ExplorePage() {
               <div className="flex items-center gap-2">
                 <SlidersHorizontal size={18} />
                 <span className="text-sm hidden md:block whitespace-nowrap">
-                  {sortOption === "newest" && "Paling Baru"}
-                  {sortOption === "oldest" && "Paling Lama"}
+                  {sortOption === "newest" && "Waktu Terdekat"}
+                  {sortOption === "oldest" && "Waktu Terjauh"}
                   {sortOption === "lowPrice" && "Harga Terendah"}
                   {sortOption === "highPrice" && "Harga Tertinggi"}
                 </span>
@@ -184,8 +184,8 @@ export default function ExplorePage() {
             {isSortOpen && (
               <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-xl shadow-xl border border-gray-100 z-[60] overflow-hidden animate-fade-in origin-top-right">
                 {[
-                  { val: "newest", label: "Paling Baru" },
-                  { val: "oldest", label: "Paling Lama" },
+                  { val: "newest", label: "Waktu Terdekat" },
+                  { val: "oldest", label: "Waktu Terjauh" },
                   { val: "lowPrice", label: "Harga Terendah" },
                   { val: "highPrice", label: "Harga Tertinggi" },
                 ].map((opt) => (

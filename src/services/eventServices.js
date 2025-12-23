@@ -137,23 +137,21 @@ export const eventService = {
 
           switch (params.sortBy) {
             case "newest":
-              // Paling Baru
-              return dateB - dateA;
-
-            case "oldest":
-              // Paling Lama
+              // TERDEKAT: Mengurutkan berdasarkan tanggal pelaksanaan paling awal
               return dateA - dateB;
 
+            case "oldest":
+              // TERJAUH: Mengurutkan berdasarkan tanggal pelaksanaan paling akhir
+              return dateB - dateA;
+
             case "lowPrice":
-              // Harga Terendah
               return (a.price || 0) - (b.price || 0);
 
             case "highPrice":
-              // Harga Tertinggi
               return (b.price || 0) - (a.price || 0);
 
             default:
-              return dateB - dateA;
+              return dateA - dateB;
           }
         });
       } else {
